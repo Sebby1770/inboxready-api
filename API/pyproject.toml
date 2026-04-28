@@ -1,0 +1,49 @@
+[project]
+name = "inboxready-api"
+version = "0.1.0"
+description = "A developer-first email domain readiness audit API."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "dnspython>=2.7.0",
+  "fastapi>=0.115.0",
+  "httpx>=0.28.0",
+  "jinja2>=3.1.0",
+  "pydantic-settings>=2.7.0",
+  "uvicorn[standard]>=0.34.0",
+]
+
+[project.scripts]
+inboxready = "inboxready_api.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+inboxready_api = [
+  "templates/*.html",
+  "static/css/*.css",
+  "static/js/*.js",
+  "static/img/*.svg",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src",
+]
+testpaths = [
+  "tests",
+]

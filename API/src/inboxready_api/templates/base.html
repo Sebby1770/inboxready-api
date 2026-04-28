@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} · InboxReady</title>
+    <meta name="description" content="{{ page_description }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='img/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+    <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
+  </head>
+  <body class="{{ body_class|default('') }}">
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="/">
+          <span class="brand-mark">IR</span>
+          <span class="brand-copy">
+            <strong>InboxReady</strong>
+            <span>Domain readiness for sender-facing SaaS</span>
+          </span>
+        </a>
+
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/#product">Product</a>
+          <a href="/#workflow">Workflow</a>
+          <a href="/#pricing">Pricing</a>
+          <a href="/#faq">FAQ</a>
+          <a href="/docs">API Docs</a>
+        </nav>
+
+        <div class="header-actions">
+          <span class="header-status" data-health-indicator>
+            <span class="status-dot"></span>
+            Checking API
+          </span>
+          <a class="button button-secondary" href="/app">Open Workspace</a>
+        </div>
+      </header>
+
+      <main>
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-grid">
+          <div>
+            <div class="footer-brand">
+              <span class="brand-mark">IR</span>
+              <strong>InboxReady</strong>
+            </div>
+            <p>
+              A focused API for auditing customer email domain posture before support
+              queues and deliverability issues get expensive.
+            </p>
+          </div>
+
+          <div>
+            <h3>Product</h3>
+            <a href="/#product">Capabilities</a>
+            <a href="/#workflow">Workflow</a>
+            <a href="/app">Workspace</a>
+          </div>
+
+          <div>
+            <h3>Developers</h3>
+            <a href="/docs">OpenAPI Docs</a>
+            <a href="/api">API Metadata</a>
+            <a href="/healthz">Health Check</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

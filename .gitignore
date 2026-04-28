@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+!API/.env.example
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+API/.venv/
+API/src/*.egg-info/
