@@ -469,9 +469,11 @@ def test_malformed_password_hashes_fail_closed(encoded: str) -> None:
 def test_dashboard_batch_audit_uses_session(monkeypatch) -> None:
     authenticated = TestClient(app)
     email = f"batch-session-{uuid4()}@example.com"
+    signup_token = csrf_token(authenticated, "/signup")
     signup = authenticated.post(
         "/signup",
         data={
+            "csrf_token": signup_token,
             "email": email,
             "password": "LaunchPass123",
             "key_name": "Dashboard key",
@@ -505,8 +507,10 @@ def test_dashboard_batch_audit_uses_session(monkeypatch) -> None:
 
     monkeypatch.setattr("inboxready_api.main.audit_domains", fake_audit_domains)
 
+    dashboard_token = csrf_token(authenticated, "/dashboard")
     response = authenticated.post(
         "/dashboard/audits/batch",
+        headers={"X-CSRF-Token": dashboard_token},
         json={"domains": ["example.com"], "selectors": [], "expected_providers": []},
     )
 
