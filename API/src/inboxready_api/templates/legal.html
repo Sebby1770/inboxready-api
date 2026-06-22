@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section legal-section">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">{{ "Privacy" if legal_mode == "privacy" else "Terms" }}</p>
+      <h1>{{ "Privacy policy" if legal_mode == "privacy" else "Terms of service" }}</h1>
+      <p>
+        These launch placeholders are here so the product has the expected commercial surfaces.
+        Replace them with reviewed legal text before public paid launch.
+      </p>
+    </div>
+
+    <article class="panel legal-panel" data-reveal>
+      {% if legal_mode == "privacy" %}
+        <h2>What this launch build stores</h2>
+        <p>InboxReady stores account email addresses, hashed passwords, API key metadata, audit history, billing identifiers, and support requests needed to operate the product.</p>
+        <h2>How the data is used</h2>
+        <p>The stored data is used to authenticate users, meter plan usage, diagnose customer setup issues, and operate billing and support workflows.</p>
+        <h2>Third-party services</h2>
+        <p>If you enable billing, Stripe processes subscription and payment data. DNS lookups and policy fetches happen during audits to generate results.</p>
+        <h2>Retention and deletion</h2>
+        <p>Replace this section with your actual retention schedule, deletion process, and contact path for privacy requests.</p>
+      {% else %}
+        <h2>Service scope</h2>
+        <p>InboxReady provides API and workflow tools for auditing email-domain posture. The launch build is offered on a best-effort basis until production SLAs are defined.</p>
+        <h2>Customer responsibility</h2>
+        <p>Customers remain responsible for their DNS configuration, sender reputation, mailbox-provider compliance, and lawful use of the platform.</p>
+        <h2>Billing and upgrades</h2>
+        <p>Paid plans are governed by your Stripe subscription configuration. Replace this section with refund, renewal, and cancellation language before launch.</p>
+        <h2>Acceptable use</h2>
+        <p>Do not use the service for abusive traffic, unauthorized access, or activity that harms other senders, providers, or customers.</p>
+      {% endif %}
+    </article>
+  </section>
+{% endblock %}

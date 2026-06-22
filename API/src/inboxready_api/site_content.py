@@ -152,8 +152,9 @@ FAQS = [
     {
         "question": "What would you build next after this MVP?",
         "answer": (
-            "API keys, usage metering, stored audit history, Stripe billing, scheduled "
-            "re-checks, webhook alerts, and branded remediation guides."
+            "API keys, usage metering, stored audit history, and Stripe billing hooks are now "
+            "in the launch layer. Scheduled re-checks, webhook alerts, and branded remediation "
+            "guides are the next retention features."
         ),
     },
 ]
@@ -169,7 +170,10 @@ SAMPLE_CURL = """curl -X POST https://api.inboxready.dev/v1/audits/email-domain 
 
 SAMPLE_JS = """const response = await fetch("/v1/audits/email-domain", {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Authorization": `Bearer ${process.env.INBOXREADY_API_KEY}`,
+    "Content-Type": "application/json"
+  },
   body: JSON.stringify({
     domain: "customer-example.com",
     selectors: ["google", "selector1"]
@@ -178,4 +182,3 @@ SAMPLE_JS = """const response = await fetch("/v1/audits/email-domain", {
 
 const audit = await response.json();
 console.log(audit.score, audit.recommendations);"""
-

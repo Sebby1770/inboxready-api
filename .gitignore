@@ -15,3 +15,5 @@ build/
 
 API/.venv/
 API/src/*.egg-info/
+API/var/
+var/

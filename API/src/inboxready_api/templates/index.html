@@ -13,7 +13,11 @@
 
       <div class="hero-actions">
         <a class="button" href="/app">Run Live Domain Audit</a>
-        <a class="button button-secondary" href="/docs">Browse API Docs</a>
+        {% if current_account %}
+          <a class="button button-secondary" href="/dashboard">Open Dashboard</a>
+        {% else %}
+          <a class="button button-secondary" href="/signup">Create Free Account</a>
+        {% endif %}
       </div>
 
       <div class="signal-strip">
@@ -163,7 +167,7 @@
               <li>{{ feature }}</li>
             {% endfor %}
           </ul>
-          <a class="button {% if not tier.featured %}button-secondary{% endif %}" href="/app">{{ tier.cta }}</a>
+          <a class="button {% if not tier.featured %}button-secondary{% endif %}" href="{% if current_account %}/dashboard#billing{% else %}/signup{% endif %}">{{ tier.cta }}</a>
         </article>
       {% endfor %}
     </div>
@@ -189,15 +193,15 @@
     <div class="cta-panel">
       <div>
         <p class="section-kicker">Next step</p>
-        <h2>Run the workspace locally, then decide what to productize next.</h2>
+        <h2>Run a public audit, then create an API key for the real product surface.</h2>
         <p>
-          The current build already behaves like a credible SaaS front door. The next layer is
-          customer accounts, billing, persistent history, and scheduled monitoring.
+          The free checker is rate-limited for discovery. The versioned API now supports keys,
+          usage metering, saved history, support intake, and billing hooks for early customers.
         </p>
       </div>
       <div class="cta-actions">
         <a class="button" href="/app">Open Workspace</a>
-        <a class="button button-secondary" href="/docs">Open Swagger Docs</a>
+        <a class="button button-secondary" href="{% if current_account %}/dashboard{% else %}/signup{% endif %}">{% if current_account %}Open Dashboard{% else %}Create Account{% endif %}</a>
       </div>
     </div>
   </section>

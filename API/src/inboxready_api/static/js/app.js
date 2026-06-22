@@ -16,6 +16,13 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function parseDomains(value) {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function getStatusLabel(status) {
   return {
     pass: "Ready",
@@ -88,6 +95,15 @@ function renderErrorState(target, message) {
     <div class="result-error">
       <h3>Audit failed</h3>
       <p>${escapeHtml(message)}</p>
+    </div>
+  `;
+}
+
+function renderBatchEmptyState(target) {
+  target.innerHTML = `
+    <div class="result-empty">
+      <h3>Batch review ready</h3>
+      <p>Submit up to 10 domains to compare scores, shared issues, and repeated remediation patterns.</p>
     </div>
   `;
 }
@@ -189,8 +205,38 @@ function renderAudit(target, audit) {
   `;
 }
 
-async function runAudit(payload) {
-  const response = await fetch("/v1/audits/email-domain", {
+async function runAudit(payload, endpoint = "/demo/audit") {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let message = `The API returned ${response.status}.`;
+    try {
+      const error = await response.json();
+      if (error?.detail) {
+        message = typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail);
+      }
+    } catch {
+      // No extra payload to parse.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+async function runBatchAudit(payload, endpoint) {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -250,7 +296,7 @@ function initAuditForm(form) {
     renderLoadingState(resultsTarget, domain);
 
     try {
-      const audit = await runAudit(payload);
+      const audit = await runAudit(payload, form.dataset.endpoint || "/demo/audit");
       saveRecentDomain(audit.domain);
       renderAudit(resultsTarget, audit);
       renderRecentDomains(recentTarget, (recentDomain) => {
@@ -274,6 +320,109 @@ function initAuditForm(form) {
     domainInput.value = queryDomain;
     form.requestSubmit();
   }
+}
+
+function renderBatchResult(target, payload) {
+  const recommendations = payload.summary.priority_recommendations.length
+    ? payload.summary.priority_recommendations
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.severity)}</strong> · ${escapeHtml(item.message)} <span>${escapeHtml(
+              item.affected_domains.join(", ")
+            )}</span></li>`
+        )
+        .join("")
+    : "<li>No repeated remediation patterns were detected.</li>";
+
+  const rows = payload.audits
+    .map(
+      (audit) => `
+        <div class="history-row">
+          <span>${escapeHtml(audit.domain)}</span>
+          <span>${escapeHtml(audit.score)}/100</span>
+          <span><span class="status-pill status-${escapeHtml(audit.overall_status)}">${getStatusLabel(
+            audit.overall_status
+          )}</span></span>
+          <span>${escapeHtml(audit.checked_at)}</span>
+        </div>
+      `
+    )
+    .join("");
+
+  target.innerHTML = `
+    <div class="audit-report">
+      <div class="stats-grid">
+        <article class="metric-card is-visible">
+          <strong>${escapeHtml(payload.summary.domain_count)}</strong>
+          <span>domains reviewed</span>
+        </article>
+        <article class="metric-card is-visible">
+          <strong>${escapeHtml(payload.summary.average_score)}</strong>
+          <span>average score</span>
+        </article>
+        <article class="metric-card is-visible">
+          <strong>${escapeHtml(payload.summary.status_counts.fail || 0)}</strong>
+          <span>failing domains</span>
+        </article>
+      </div>
+
+      <div class="provider-list">
+        <h4>Repeated recommendations</h4>
+        <ul>${recommendations}</ul>
+      </div>
+
+      <div class="history-table">
+        <div class="history-row history-head">
+          <span>Domain</span>
+          <span>Score</span>
+          <span>Status</span>
+          <span>Checked at</span>
+        </div>
+        ${rows}
+      </div>
+    </div>
+  `;
+}
+
+function initBatchForm(form) {
+  const resultsTarget = document.getElementById(form.dataset.resultsTarget);
+  const submitButton = form.querySelector('button[type="submit"]');
+  const domainsField = form.querySelector('textarea[name="domains"]');
+  const selectorsInput = form.querySelector('input[name="selectors"]');
+  const expectedProvidersInput = form.querySelector('input[name="expected_providers"]');
+
+  if (!resultsTarget || !submitButton || !domainsField) return;
+
+  renderBatchEmptyState(resultsTarget);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const domains = parseDomains(domainsField.value);
+    if (!domains.length) {
+      renderErrorState(resultsTarget, "Enter at least one domain.");
+      return;
+    }
+
+    const payload = {
+      domains,
+      selectors: parseCsv(selectorsInput?.value || ""),
+      expected_providers: parseCsv(expectedProvidersInput?.value || ""),
+    };
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Running…";
+    renderLoadingState(resultsTarget, `${domains.length} domains`);
+
+    try {
+      const result = await runBatchAudit(payload, form.dataset.endpoint || "/v1/audits/batch");
+      renderBatchResult(resultsTarget, result);
+    } catch (error) {
+      renderErrorState(resultsTarget, error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = "Run Batch Audit";
+    }
+  });
 }
 
 function initRevealAnimations() {
@@ -316,6 +465,7 @@ async function initHealthIndicator() {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-audit-form]").forEach(initAuditForm);
+  document.querySelectorAll("[data-batch-form]").forEach(initBatchForm);
   initRevealAnimations();
   initHealthIndicator();
 });

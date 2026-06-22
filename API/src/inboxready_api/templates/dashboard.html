@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section workspace-hero">
+    <div class="section-heading compact" data-reveal>
+      <p class="section-kicker">Dashboard</p>
+      <h1>Manage usage, rotate keys, and turn audits into a repeatable customer workflow.</h1>
+      <p>
+        This is the operator surface for your actual account. It ties the audit engine to plan
+        limits, persistent history, billing entry points, and support.
+      </p>
+    </div>
+  </section>
+
+  {% if one_time_api_key %}
+    <section class="section">
+      <div class="panel one-time-key" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">One-time secret</p>
+            <h2>Store this API key now</h2>
+          </div>
+        </div>
+        <label>
+          Plaintext API key
+          <textarea rows="3" readonly>{{ one_time_api_key }}</textarea>
+        </label>
+        <p class="result-note">This plaintext key is shown once. Copy it into your password manager or secret store before leaving the page.</p>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="section dashboard-layout">
+    <div class="dashboard-main">
+      <section class="panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Account overview</p>
+            <h2>{{ dashboard_account.email }}</h2>
+          </div>
+          <span class="panel-badge">{{ usage.plan|upper }}</span>
+        </div>
+
+        <div class="stats-grid">
+          <article class="metric-card is-visible">
+            <strong>{{ usage.audits_used }}</strong>
+            <span>audits used this month</span>
+          </article>
+          <article class="metric-card is-visible">
+            <strong>{{ usage.audits_remaining }}</strong>
+            <span>audits remaining this month</span>
+          </article>
+          <article class="metric-card is-visible">
+            <strong>{{ usage.rate_limit_per_minute }}</strong>
+            <span>audit units per minute</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Run audit</p>
+            <h2>Use your account limits</h2>
+          </div>
+          <span class="panel-badge">Logged-in session</span>
+        </div>
+
+        <form
+          class="audit-form"
+          data-audit-form
+          data-endpoint="/dashboard/audit"
+          data-results-target="dashboard-results"
+          data-recent-target="dashboard-recents"
+        >
+          <label>
+            Root domain
+            <input name="domain" type="text" placeholder="customer-example.com" value="example.com" required>
+          </label>
+          <label>
+            DKIM selectors
+            <input name="selectors" type="text" placeholder="google, selector1">
+          </label>
+          <label>
+            Expected providers
+            <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="button">Run Audit</button>
+            <a class="button button-secondary" href="/docs">Open API Docs</a>
+          </div>
+        </form>
+
+        <div class="recent-domains" id="dashboard-recents"></div>
+        <div class="result-shell" id="dashboard-results"></div>
+      </section>
+
+      <section class="panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Batch audit</p>
+            <h2>Review multiple customer domains at once</h2>
+          </div>
+          <span class="panel-badge">Up to 10 domains</span>
+        </div>
+
+        <form
+          class="audit-form stacked"
+          data-batch-form
+          data-endpoint="/dashboard/audits/batch"
+          data-results-target="batch-results"
+        >
+          <label>
+            Domains
+            <textarea name="domains" rows="6" placeholder="example.com&#10;openai.com&#10;customer-brand.com" required></textarea>
+          </label>
+          <label>
+            Shared DKIM selectors
+            <input name="selectors" type="text" placeholder="google, selector1">
+          </label>
+          <label>
+            Expected providers
+            <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
+          </label>
+          <button type="submit" class="button">Run Batch Audit</button>
+        </form>
+
+        <div class="result-shell" id="batch-results"></div>
+      </section>
+
+      <section class="panel" id="history" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Audit history</p>
+            <h2>Recent account activity</h2>
+          </div>
+          <span class="panel-badge">{{ audit_history.audits|length }} recent rows</span>
+        </div>
+
+        {% if audit_history.audits %}
+          <div class="history-table">
+            <div class="history-row history-head">
+              <span>Domain</span>
+              <span>Score</span>
+              <span>Status</span>
+              <span>When</span>
+            </div>
+            {% for audit in audit_history.audits %}
+              <div class="history-row">
+                <span>{{ audit.domain }}</span>
+                <span>{{ audit.score }}/100</span>
+                <span><span class="status-pill status-{{ audit.overall_status }}">{{ audit.overall_status }}</span></span>
+                <span>{{ audit.created_at }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="result-empty">No account audits yet. Run your first domain check above.</div>
+        {% endif %}
+      </section>
+    </div>
+
+    <aside class="dashboard-sidebar">
+      <section class="panel" id="api-keys" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Credentials</p>
+            <h2>API keys</h2>
+          </div>
+        </div>
+
+        <form method="post" action="/dashboard/api-keys" class="audit-form stacked compact-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label>
+            New key name
+            <input name="name" type="text" value="API key" maxlength="80">
+          </label>
+          <button class="button full-width" type="submit">Create new key</button>
+        </form>
+
+        <div class="key-list">
+          {% for key in api_keys %}
+            <article class="key-card">
+              <div>
+                <strong>{{ key.name }}</strong>
+                <p>{{ key.prefix }}{% if key.revoked_at %} · revoked{% endif %}</p>
+                <p>Last used: {{ key.last_used_at or 'Never' }}</p>
+              </div>
+              {% if not key.revoked_at %}
+                <form method="post" action="/dashboard/api-keys/{{ key.id }}/revoke">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="button button-ghost" type="submit">Revoke</button>
+                </form>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel" id="billing" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Billing</p>
+            <h2>Plan controls</h2>
+          </div>
+          <span class="panel-badge">{{ 'Stripe ready' if billing_enabled else 'Setup needed' }}</span>
+        </div>
+
+        <p class="result-note">
+          {% if billing_enabled %}
+            Create a Checkout session for upgrades or open the Stripe customer portal if this account already has a customer record.
+          {% else %}
+            Stripe is not configured yet. Add the price IDs and secrets in `.env` before using paid plan upgrades.
+          {% endif %}
+        </p>
+
+        <div class="billing-actions">
+          {% for tier in pricing_tiers %}
+            <form method="post" action="/dashboard/billing/checkout" class="billing-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="plan" value="{{ tier.name|lower }}">
+              <button class="button {% if not tier.featured %}button-secondary{% endif %} full-width" type="submit" {% if not billing_enabled %}disabled{% endif %}>
+                Upgrade to {{ tier.name }}
+              </button>
+            </form>
+          {% endfor %}
+          <form method="post" action="/dashboard/billing/portal" class="billing-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button button-ghost full-width" type="submit" {% if not billing_enabled %}disabled{% endif %}>Open billing portal</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Quickstart</p>
+            <h2>Ship the integration</h2>
+          </div>
+        </div>
+        <p class="result-note">
+          Your API is ready to embed in onboarding, support, and deliverability tooling. Start with a single-domain check, then graduate to batch reviews for customer portfolios.
+        </p>
+        <details class="json-panel" open>
+          <summary>Recommended cURL flow</summary>
+          <pre>curl -X POST {{ request.url.scheme }}://{{ request.url.netloc }}/v1/audits/email-domain \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"customer-example.com","selectors":["google"]}'</pre>
+        </details>
+      </section>
+
+      <section class="panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Support</p>
+            <h2>Need help?</h2>
+          </div>
+        </div>
+        <p class="result-note">For onboarding, billing, or domain-setup help, open the support form or email {{ support_email }}.</p>
+        <a class="button full-width" href="/support">Open Support</a>
+      </section>
+    </aside>
+  </section>
+{% endblock %}

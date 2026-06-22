@@ -6,12 +6,14 @@ services:
     rootDir: API
     buildCommand: pip install .
     startCommand: uvicorn inboxready_api.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /healthz
+    healthCheckPath: /readyz
     autoDeployTrigger: commit
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5
       - key: INBOXREADY_HTTP_TIMEOUT_SECONDS
         value: 5.0
+      - key: INBOXREADY_BATCH_MAX_WORKERS
+        value: 5
       - key: INBOXREADY_USER_AGENT
         value: InboxReady/0.1 (+https://example.com)

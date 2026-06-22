@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section support-section">
+    <div class="auth-grid">
+      <div class="auth-copy" data-reveal>
+        <p class="section-kicker">Support</p>
+        <h1>Ask for help with onboarding, billing, or DNS setup.</h1>
+        <p class="hero-lead">
+          This is the lightweight support layer for launch. Requests are stored locally and routed
+          through your support email until you connect a helpdesk or ticketing backend.
+        </p>
+      </div>
+
+      <section class="panel auth-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Contact us</p>
+            <h2>Support request</h2>
+          </div>
+        </div>
+
+        {% if form_error %}
+          <div class="inline-error">{{ form_error }}</div>
+        {% endif %}
+
+        <form method="post" action="/support" class="audit-form stacked auth-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label>
+            Email
+            <input name="email" type="email" value="{{ support_form.email if support_form else current_account.email if current_account else '' }}" placeholder="team@example.com" required>
+          </label>
+          <label>
+            Subject
+            <input name="subject" type="text" value="{{ support_form.subject if support_form else '' }}" placeholder="Need help with onboarding" required>
+          </label>
+          <label>
+            Message
+            <textarea name="message" rows="8" placeholder="Tell us what domain you are working on, what you expected, and what is blocking you." required>{{ support_form.message if support_form else '' }}</textarea>
+          </label>
+          <button type="submit" class="button full-width">Send support request</button>
+        </form>
+      </section>
+    </div>
+  </section>
+{% endblock %}
