@@ -1,208 +1,288 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="hero-section section">
-    <div class="hero-copy" data-reveal>
-      <div class="eyebrow-pill">Email authentication, without the support backlog</div>
-      <h1>Audit customer sending domains like a polished SaaS, not a bundle of DNS scripts.</h1>
-      <p class="hero-lead">
-        InboxReady is a developer-first API and workflow surface for checking MX, SPF, DKIM,
-        DMARC, BIMI, MTA-STS, and TLS-RPT in one response. It is built for products that
-        need customer domains to work reliably before email volume grows.
-      </p>
+<section class="hero-section section">
+  <div class="hero-copy" data-reveal>
+    <div class="eyebrow-pill">
+      Email authentication, without the support backlog
+    </div>
+    <h1>
+      Audit customer sending domains like a polished SaaS, not a bundle of DNS
+      scripts.
+    </h1>
+    <p class="hero-lead">
+      InboxReady is a developer-first API and workflow surface for checking MX,
+      SPF, DKIM, DMARC, BIMI, MTA-STS, and TLS-RPT in one response. It is built
+      for products that need customer domains to work reliably before email
+      volume grows.
+    </p>
 
-      <div class="hero-actions">
-        <a class="button" href="/app">Run Live Domain Audit</a>
-        {% if current_account %}
-          <a class="button button-secondary" href="/dashboard">Open Dashboard</a>
-        {% else %}
-          <a class="button button-secondary" href="/signup">Create Free Account</a>
-        {% endif %}
-      </div>
-
-      <div class="signal-strip">
-        {% for item in signal_strips %}
-          <span>{{ item }}</span>
-        {% endfor %}
-      </div>
-
-      <div class="metric-grid">
-        {% for metric in hero_metrics %}
-          <article class="metric-card" data-reveal>
-            <strong>{{ metric.value }}</strong>
-            <span>{{ metric.label }}</span>
-          </article>
-        {% endfor %}
-      </div>
+    <div class="hero-actions">
+      <a class="button" href="/app">Run Live Domain Audit</a>
+      {% if current_account %}
+      <a class="button button-secondary" href="/dashboard">Open Dashboard</a>
+      {% else %}
+      <a class="button button-secondary" href="/signup">Create Free Account</a>
+      {% endif %}
     </div>
 
-    <div class="hero-panel panel" data-reveal>
+    <div class="signal-strip">
+      {% for item in signal_strips %}
+      <span>{{ item }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="metric-grid">
+      {% for metric in hero_metrics %}
+      <article class="metric-card" data-reveal>
+        <strong>{{ metric.value }}</strong>
+        <span>{{ metric.label }}</span>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="hero-panel panel" data-reveal>
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Live preview</p>
+        <h2>See the audit product in action</h2>
+      </div>
+      <span class="panel-badge">Interactive</span>
+    </div>
+
+    <form
+      class="audit-form"
+      data-audit-form
+      data-results-target="hero-results"
+      data-recent-target="hero-recents"
+    >
+      <label>
+        Root domain
+        <input
+          name="domain"
+          type="text"
+          placeholder="customer-example.com"
+          value="example.com"
+          required
+        />
+      </label>
+      <label>
+        DKIM selectors
+        <input name="selectors" type="text" placeholder="google, selector1" />
+      </label>
+      <label>
+        Expected providers
+        <input
+          name="expected_providers"
+          type="text"
+          placeholder="Google Workspace, SendGrid"
+        />
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="button">Run Audit</button>
+        <a href="/app" class="button button-secondary">Open Full Workspace</a>
+      </div>
+    </form>
+
+    <div class="recent-domains" id="hero-recents"></div>
+    <div class="result-shell" id="hero-results"></div>
+  </div>
+</section>
+
+<section class="section" id="product">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Where it fits</p>
+    <h2>
+      Built for the teams who own activation, support, and deliverability.
+    </h2>
+    <p>
+      This is not another generic website. It is a narrowly-shaped product
+      surface for customer-domain onboarding, support diagnostics, and long-term
+      sender hygiene.
+    </p>
+  </div>
+
+  <div class="use-case-grid">
+    {% for use_case in use_cases %}
+    <article class="use-case-card panel" data-reveal>
+      <p class="card-kicker">{{ use_case.eyebrow }}</p>
+      <h3>{{ use_case.title }}</h3>
+      <p>{{ use_case.body }}</p>
+      <ul class="card-points">
+        {% for point in use_case.points %}
+        <li>{{ point }}</li>
+        {% endfor %}
+      </ul>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section workflow-section" id="workflow">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Workflow</p>
+    <h2>One service. Two clear surfaces.</h2>
+    <p>
+      Your public site sells the pain cleanly. Your workspace lets operators and
+      prospects run live audits. Your API remains the product engine behind
+      both.
+    </p>
+  </div>
+
+  <div class="steps-grid">
+    {% for step in flow_steps %}
+    <article class="step-card" data-reveal>
+      <span>{{ step.number }}</span>
+      <h3>{{ step.title }}</h3>
+      <p>{{ step.body }}</p>
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="code-grid">
+    <article class="panel code-panel" data-reveal>
       <div class="panel-header">
         <div>
-          <p class="panel-label">Live preview</p>
-          <h2>See the audit product in action</h2>
+          <p class="panel-label">cURL</p>
+          <h3>Ship a setup check in hours</h3>
         </div>
-        <span class="panel-badge">Interactive</span>
       </div>
+      <pre><code>{{ sample_curl }}</code></pre>
+    </article>
 
-      <form
-        class="audit-form"
-        data-audit-form
-        data-results-target="hero-results"
-        data-recent-target="hero-recents"
-      >
-        <label>
-          Root domain
-          <input name="domain" type="text" placeholder="customer-example.com" value="example.com" required>
-        </label>
-        <label>
-          DKIM selectors
-          <input name="selectors" type="text" placeholder="google, selector1">
-        </label>
-        <label>
-          Expected providers
-          <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
-        </label>
-        <div class="form-actions">
-          <button type="submit" class="button">Run Audit</button>
-          <a href="/app" class="button button-secondary">Open Full Workspace</a>
+    <article class="panel code-panel" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">JavaScript</p>
+          <h3>Drive UI decisions from the response</h3>
         </div>
-      </form>
+      </div>
+      <pre><code>{{ sample_js }}</code></pre>
+    </article>
+  </div>
+</section>
 
-      <div class="recent-domains" id="hero-recents"></div>
-      <div class="result-shell" id="hero-results"></div>
-    </div>
-  </section>
+<section class="section release-section" id="changelog">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Shipping notes</p>
+    <h2>The product is moving, and customers can see it.</h2>
+    <p>
+      Release visibility matters in B2B SaaS. Instead of hiding progress in a
+      repo, InboxReady surfaces recent product work where prospects and
+      operators already spend time.
+    </p>
+  </div>
 
-  <section class="section" id="product">
-    <div class="section-heading" data-reveal>
-      <p class="section-kicker">Where it fits</p>
-      <h2>Built for the teams who own activation, support, and deliverability.</h2>
-      <p>
-        This is not another generic website. It is a narrowly-shaped product surface for
-        customer-domain onboarding, support diagnostics, and long-term sender hygiene.
-      </p>
-    </div>
+  <div class="release-grid">
+    {% for entry in changelog_preview %}
+    <article class="panel release-card" data-reveal>
+      <div class="release-meta">
+        <span class="panel-badge">v{{ entry.version }}</span>
+        <span class="release-date">{{ entry.display_date }}</span>
+      </div>
+      <h3>{{ entry.title }}</h3>
+      <p class="release-summary">{{ entry.summary }}</p>
+      <ul class="card-points">
+        {% for item in entry.highlights %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      <p class="release-impact">{{ entry.impact }}</p>
+    </article>
+    {% endfor %}
+  </div>
 
-    <div class="use-case-grid">
-      {% for use_case in use_cases %}
-        <article class="use-case-card panel" data-reveal>
-          <p class="card-kicker">{{ use_case.eyebrow }}</p>
-          <h3>{{ use_case.title }}</h3>
-          <p>{{ use_case.body }}</p>
-          <ul class="card-points">
-            {% for point in use_case.points %}
-              <li>{{ point }}</li>
-            {% endfor %}
-          </ul>
-        </article>
-      {% endfor %}
-    </div>
-  </section>
+  <div class="release-actions" data-reveal>
+    <a class="button button-secondary" href="/changelog">View Full Changelog</a>
+    <a
+      class="button"
+      href="{% if current_account %}/dashboard{% else %}/signup{% endif %}"
+      >{% if current_account %}Open Dashboard{% else %}Create Account{% endif
+      %}</a
+    >
+  </div>
+</section>
 
-  <section class="section workflow-section" id="workflow">
-    <div class="section-heading" data-reveal>
-      <p class="section-kicker">Workflow</p>
-      <h2>One service. Two clear surfaces.</h2>
-      <p>
-        Your public site sells the pain cleanly. Your workspace lets operators and prospects
-        run live audits. Your API remains the product engine behind both.
-      </p>
-    </div>
+<section class="section pricing-section" id="pricing">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Pricing</p>
+    <h2>
+      Simple enough for a startup budget, serious enough for recurring usage.
+    </h2>
+    <p>
+      The pricing model matches an API product: subscription tiers with room for
+      usage-based overages as audit volume grows.
+    </p>
+  </div>
 
-    <div class="steps-grid">
-      {% for step in flow_steps %}
-        <article class="step-card" data-reveal>
-          <span>{{ step.number }}</span>
-          <h3>{{ step.title }}</h3>
-          <p>{{ step.body }}</p>
-        </article>
-      {% endfor %}
-    </div>
-
-    <div class="code-grid">
-      <article class="panel code-panel" data-reveal>
-        <div class="panel-header">
-          <div>
-            <p class="panel-label">cURL</p>
-            <h3>Ship a setup check in hours</h3>
-          </div>
-        </div>
-        <pre><code>{{ sample_curl }}</code></pre>
-      </article>
-
-      <article class="panel code-panel" data-reveal>
-        <div class="panel-header">
-          <div>
-            <p class="panel-label">JavaScript</p>
-            <h3>Drive UI decisions from the response</h3>
-          </div>
-        </div>
-        <pre><code>{{ sample_js }}</code></pre>
-      </article>
-    </div>
-  </section>
-
-  <section class="section pricing-section" id="pricing">
-    <div class="section-heading" data-reveal>
-      <p class="section-kicker">Pricing</p>
-      <h2>Simple enough for a startup budget, serious enough for recurring usage.</h2>
-      <p>
-        The pricing model matches an API product: subscription tiers with room for usage-based
-        overages as audit volume grows.
-      </p>
-    </div>
-
-    <div class="pricing-grid">
-      {% for tier in pricing_tiers %}
-        <article class="price-card {% if tier.featured %}featured{% endif %}" data-reveal>
-          <div>
-            <p class="card-kicker">{{ "Most balanced" if tier.featured else "Plan" }}</p>
-            <h3>{{ tier.name }}</h3>
-            <p class="price-line">{{ tier.price }}<span>{{ tier.period }}</span></p>
-            <p class="price-description">{{ tier.description }}</p>
-          </div>
-          <ul class="card-points">
-            {% for feature in tier.features %}
-              <li>{{ feature }}</li>
-            {% endfor %}
-          </ul>
-          <a class="button {% if not tier.featured %}button-secondary{% endif %}" href="{% if current_account %}/dashboard#billing{% else %}/signup{% endif %}">{{ tier.cta }}</a>
-        </article>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="section faq-section" id="faq">
-    <div class="section-heading" data-reveal>
-      <p class="section-kicker">FAQ</p>
-      <h2>A practical MVP, positioned like a real company.</h2>
-    </div>
-
-    <div class="faq-grid">
-      {% for faq in faqs %}
-        <article class="faq-card panel" data-reveal>
-          <h3>{{ faq.question }}</h3>
-          <p>{{ faq.answer }}</p>
-        </article>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="section cta-section" data-reveal>
-    <div class="cta-panel">
+  <div class="pricing-grid">
+    {% for tier in pricing_tiers %}
+    <article
+      class="price-card {% if tier.featured %}featured{% endif %}"
+      data-reveal
+    >
       <div>
-        <p class="section-kicker">Next step</p>
-        <h2>Run a public audit, then create an API key for the real product surface.</h2>
-        <p>
-          The free checker is rate-limited for discovery. The versioned API now supports keys,
-          usage metering, saved history, support intake, and billing hooks for early customers.
+        <p class="card-kicker">
+          {{ "Most balanced" if tier.featured else "Plan" }}
         </p>
+        <h3>{{ tier.name }}</h3>
+        <p class="price-line">{{ tier.price }}<span>{{ tier.period }}</span></p>
+        <p class="price-description">{{ tier.description }}</p>
       </div>
-      <div class="cta-actions">
-        <a class="button" href="/app">Open Workspace</a>
-        <a class="button button-secondary" href="{% if current_account %}/dashboard{% else %}/signup{% endif %}">{% if current_account %}Open Dashboard{% else %}Create Account{% endif %}</a>
-      </div>
+      <ul class="card-points">
+        {% for feature in tier.features %}
+        <li>{{ feature }}</li>
+        {% endfor %}
+      </ul>
+      <a
+        class="button {% if not tier.featured %}button-secondary{% endif %}"
+        href="{% if current_account %}/dashboard#billing{% else %}/signup{% endif %}"
+        >{{ tier.cta }}</a
+      >
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section faq-section" id="faq">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">FAQ</p>
+    <h2>A practical MVP, positioned like a real company.</h2>
+  </div>
+
+  <div class="faq-grid">
+    {% for faq in faqs %}
+    <article class="faq-card panel" data-reveal>
+      <h3>{{ faq.question }}</h3>
+      <p>{{ faq.answer }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section cta-section" data-reveal>
+  <div class="cta-panel">
+    <div>
+      <p class="section-kicker">Next step</p>
+      <h2>
+        Run a public audit, then create an API key for the real product surface.
+      </h2>
+      <p>
+        The free checker is rate-limited for discovery. The versioned API now
+        supports keys, usage metering, saved history, support intake, and
+        billing hooks for early customers.
+      </p>
     </div>
-  </section>
+    <div class="cta-actions">
+      <a class="button" href="/app">Open Workspace</a>
+      <a
+        class="button button-secondary"
+        href="{% if current_account %}/dashboard{% else %}/signup{% endif %}"
+        >{% if current_account %}Open Dashboard{% else %}Create Account{% endif
+        %}</a
+      >
+    </div>
+  </div>
+</section>
 {% endblock %}

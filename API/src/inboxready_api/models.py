@@ -180,6 +180,13 @@ class AuditHistoryResponse(BaseModel):
     audits: list[AuditHistoryItem]
 
 
+class AuditHistoryDetailResponse(BaseModel):
+    id: str
+    units: int
+    created_at: str
+    audit: DomainAuditResponse
+
+
 class BillingCheckoutRequest(BaseModel):
     plan: Literal["starter", "growth", "pro"]
 

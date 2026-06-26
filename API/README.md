@@ -29,6 +29,8 @@ InboxReady turns that into one API call.
 - Per-key usage metering, rate limiting, and saved audit history
 - Stripe Checkout, Billing Portal, and webhook endpoints for paid plans
 - Support page plus launch-ready privacy and terms pages
+- Public changelog page and repository-level release notes
+- Audit history CSV export plus full saved-audit JSON detail views
 - Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
 - Detects likely sending providers from DNS evidence
 - Scores domain readiness from 0-100
@@ -43,6 +45,7 @@ InboxReady turns that into one API call.
 - `GET /login`
 - `GET /dashboard`
 - `GET /support`
+- `GET /changelog`
 - `GET /privacy`
 - `GET /terms`
 - `GET /api`
@@ -56,6 +59,8 @@ InboxReady turns that into one API call.
 - `DELETE /v1/api-keys/{key_id}`
 - `GET /v1/usage`
 - `GET /v1/audit-history`
+- `GET /v1/audit-history.csv`
+- `GET /v1/audit-history/{audit_id}`
 - `GET /v1/providers`
 - `POST /v1/audits/email-domain`
 - `POST /v1/audits/batch`
@@ -176,12 +181,12 @@ headers. Set `INBOXREADY_SESSION_HTTPS_ONLY=true` behind HTTPS to enable secure 
 Usage is counted by audit unit. A single-domain audit costs 1 unit; a batch audit costs one
 unit per normalized domain. Current launch limits are:
 
-| Plan | Monthly audits | Per-minute limit |
-| --- | ---: | ---: |
-| Free | 100 | 15 |
-| Starter | 2,500 | 60 |
-| Growth | 15,000 | 180 |
-| Pro | 75,000 | 600 |
+| Plan    | Monthly audits | Per-minute limit |
+| ------- | -------------: | ---------------: |
+| Free    |            100 |               15 |
+| Starter |          2,500 |               60 |
+| Growth  |         15,000 |              180 |
+| Pro     |         75,000 |              600 |
 
 Inspect usage and saved history:
 
@@ -192,6 +197,24 @@ curl http://127.0.0.1:8000/v1/usage \
 curl http://127.0.0.1:8000/v1/audit-history \
   -H "Authorization: Bearer $INBOXREADY_API_KEY"
 ```
+
+Export saved history as CSV or open a full saved audit by ID:
+
+```bash
+curl http://127.0.0.1:8000/v1/audit-history.csv \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
+
+curl http://127.0.0.1:8000/v1/audit-history/AUDIT_ID \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
+```
+
+Logged-in dashboard users can also download `/dashboard/audit-history.csv` and open
+`/dashboard/audit-history/{audit_id}.json` from the history table.
+
+## Changelog
+
+Release notes are tracked in the root [`CHANGELOG.md`](../CHANGELOG.md) and served in the web app
+at `/changelog`.
 
 ## Billing
 

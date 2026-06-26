@@ -128,6 +128,15 @@ def test_workspace_page_renders() -> None:
     assert "Run Domain Audit" in response.text
 
 
+def test_changelog_page_renders() -> None:
+    response = client.get("/changelog")
+
+    assert response.status_code == 200
+    assert "Track what changed" in response.text
+    assert "v0.3.0" in response.text
+    assert "Roadmap" in response.text
+
+
 def test_unique_normalized_domains_keeps_first_seen_order() -> None:
     domains = unique_normalized_domains(["https://Example.com/app", "example.com", "api.example.com"])
 
@@ -330,6 +339,15 @@ def test_readiness_checks_storage() -> None:
     assert response.json() == {"status": "ready", "storage": "ok"}
 
 
+def test_api_root_exposes_changelog_metadata() -> None:
+    response = client.get("/api")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["changelog"] == "/changelog"
+    assert payload["latest_release"]["version"] == "0.3.0"
+
+
 def test_account_usage_and_history_are_metered(monkeypatch) -> None:
     def fake_audit_domain(request, settings):
         return DomainAuditResponse(
@@ -357,6 +375,18 @@ def test_account_usage_and_history_are_metered(monkeypatch) -> None:
     history = client.get("/v1/audit-history", headers=headers)
     assert history.status_code == 200
     assert history.json()["audits"][0]["domain"] == "example.com"
+    audit_id = history.json()["audits"][0]["id"]
+
+    detail = client.get(f"/v1/audit-history/{audit_id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["audit"]["domain"] == "example.com"
+    assert detail.json()["units"] == 1
+
+    csv_export = client.get("/v1/audit-history.csv", headers=headers)
+    assert csv_export.status_code == 200
+    assert "text/csv" in csv_export.headers["content-type"]
+    assert "domain,score,overall_status" in csv_export.text
+    assert "example.com" in csv_export.text
 
 
 def test_demo_endpoint_does_not_require_api_key(monkeypatch) -> None:
@@ -403,6 +433,7 @@ def test_signup_creates_session_and_dashboard_access() -> None:
     assert dashboard.status_code == 200
     assert email in dashboard.text
     assert "Store this API key now" in dashboard.text
+    assert "/dashboard/audit-history.csv" in dashboard.text
 
 
 def test_dashboard_redirects_when_not_logged_in() -> None:

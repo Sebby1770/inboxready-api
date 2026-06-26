@@ -1,63 +1,99 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="section auth-section">
-    <div class="auth-grid">
-      <div class="auth-copy" data-reveal>
-        <p class="section-kicker">{{ "Create account" if auth_mode == "signup" else "Sign in" }}</p>
-        <h1>{{ "Start your InboxReady account." if auth_mode == "signup" else "Welcome back to InboxReady." }}</h1>
-        <p class="hero-lead">
-          {{ "Create a free account to unlock dashboard usage, API key management, audit history, and billing entry points." if auth_mode == "signup" else "Sign in to manage your account, review audit usage, rotate keys, and upgrade plans." }}
-        </p>
-        <div class="signal-strip">
-          <span>Usage visibility</span>
-          <span>API keys</span>
-          <span>Billing hooks</span>
-          <span>Audit history</span>
+<section class="section auth-section">
+  <div class="auth-grid">
+    <div class="auth-copy" data-reveal>
+      <p class="section-kicker">
+        {{ "Create account" if auth_mode == "signup" else "Sign in" }}
+      </p>
+      <h1>
+        {% if auth_mode == "signup" %}
+          Start your InboxReady account.
+        {% else %}
+          Welcome back to InboxReady.
+        {% endif %}
+      </h1>
+      <p class="hero-lead">
+        {% if auth_mode == "signup" %}
+          Create a free account to unlock dashboard usage, API key management, audit history, and billing entry points.
+        {% else %}
+          Sign in to manage your account, review audit usage, rotate keys, and upgrade plans.
+        {% endif %}
+      </p>
+      <div class="signal-strip">
+        <span>Usage visibility</span>
+        <span>API keys</span>
+        <span>Billing hooks</span>
+        <span>Audit history</span>
+      </div>
+    </div>
+
+    <section class="panel auth-panel" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">{{ "Free launch tier" if auth_mode == "signup" else "Account access" }}</p>
+          <h2>
+            {{ "Create account" if auth_mode == "signup" else "Sign in" }}
+          </h2>
         </div>
+        <span class="panel-badge">{{ "100 audits / month" if auth_mode == "signup" else "Secure session" }}</span>
       </div>
 
-      <section class="panel auth-panel" data-reveal>
-        <div class="panel-header">
-          <div>
-            <p class="panel-label">{{ "Free launch tier" if auth_mode == "signup" else "Account access" }}</p>
-            <h2>{{ "Create account" if auth_mode == "signup" else "Sign in" }}</h2>
-          </div>
-          <span class="panel-badge">{{ "100 audits / month" if auth_mode == "signup" else "Secure session" }}</span>
-        </div>
+      {% if form_error %}
+      <div class="inline-error">{{ form_error }}</div>
+      {% endif %}
 
-        {% if form_error %}
-          <div class="inline-error">{{ form_error }}</div>
+      <form
+        method="post"
+        action="{{ '/signup' if auth_mode == 'signup' else '/login' }}"
+        class="audit-form stacked auth-form"
+      >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="next" value="{{ next_path }}" />
+        <label>
+          Email
+          <input
+            name="email"
+            type="email"
+            value="{{ form_email|default('') }}"
+            placeholder="founder@example.com"
+            required
+          />
+        </label>
+        <label>
+          Password
+          <input
+            name="password"
+            type="password"
+            placeholder="At least 10 characters"
+            required
+          />
+        </label>
+        {% if auth_mode == "signup" %}
+        <label>
+          First API key name
+          <input
+            name="key_name"
+            type="text"
+            value="Default key"
+            maxlength="80"
+          />
+        </label>
         {% endif %}
+        <button type="submit" class="button full-width">
+          {{ "Create free account" if auth_mode == "signup" else "Sign in" }}
+        </button>
+      </form>
 
-        <form method="post" action="{{ '/signup' if auth_mode == 'signup' else '/login' }}" class="audit-form stacked auth-form">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="next" value="{{ next_path }}">
-          <label>
-            Email
-            <input name="email" type="email" value="{{ form_email|default('') }}" placeholder="founder@example.com" required>
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" placeholder="At least 10 characters" required>
-          </label>
-          {% if auth_mode == "signup" %}
-            <label>
-              First API key name
-              <input name="key_name" type="text" value="Default key" maxlength="80">
-            </label>
-          {% endif %}
-          <button type="submit" class="button full-width">{{ "Create free account" if auth_mode == "signup" else "Sign in" }}</button>
-        </form>
-
-        <div class="auth-note">
-          {% if auth_mode == "signup" %}
-            Already have an account? <a href="/login?next={{ next_path }}">Sign in here.</a>
-          {% else %}
-            Need an account? <a href="/signup?next={{ next_path }}">Create one here.</a>
-          {% endif %}
-        </div>
-      </section>
-    </div>
-  </section>
+      <div class="auth-note">
+        {% if auth_mode == "signup" %}
+          Already have an account? <a href="/login?next={{ next_path }}">Sign in here.</a>
+        {% else %}
+          Need an account? <a href="/signup?next={{ next_path }}">Create one here.</a>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</section>
 {% endblock %}

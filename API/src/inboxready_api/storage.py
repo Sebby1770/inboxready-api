@@ -15,6 +15,7 @@ from inboxready_api.models import (
     AccountResponse,
     ApiKeyListResponse,
     ApiKeyResponse,
+    AuditHistoryDetailResponse,
     AuditHistoryItem,
     AuditHistoryResponse,
     DomainAuditResponse,
@@ -446,6 +447,73 @@ class Storage:
                 for row in rows
             ],
         )
+
+    def audit_detail(
+        self,
+        account: AccountRecord,
+        *,
+        audit_id: str,
+    ) -> AuditHistoryDetailResponse | None:
+        self.init_schema()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, units, response_json, created_at
+                FROM audit_logs
+                WHERE account_id = ? AND id = ?
+                """,
+                (account.id, audit_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+        return AuditHistoryDetailResponse(
+            id=row["id"],
+            units=row["units"],
+            created_at=row["created_at"],
+            audit=decode_audit_response(row["response_json"]),
+        )
+
+    def audit_history_export_rows(
+        self,
+        account: AccountRecord,
+        *,
+        limit: int = 500,
+    ) -> list[dict[str, object]]:
+        self.init_schema()
+        capped_limit = max(1, min(limit, 1000))
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, domain, score, overall_status, units, response_json, created_at
+                FROM audit_logs
+                WHERE account_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (account.id, capped_limit),
+            ).fetchall()
+
+        export_rows: list[dict[str, object]] = []
+        for row in rows:
+            audit = decode_audit_response(row["response_json"])
+            export_rows.append(
+                {
+                    "id": row["id"],
+                    "domain": row["domain"],
+                    "score": row["score"],
+                    "overall_status": row["overall_status"],
+                    "units": row["units"],
+                    "provider_names": ", ".join(provider.name for provider in audit.providers),
+                    "recommendation_count": len(audit.recommendations),
+                    "top_recommendation": (
+                        audit.recommendations[0].message if audit.recommendations else ""
+                    ),
+                    "checked_at": audit.checked_at,
+                    "created_at": row["created_at"],
+                }
+            )
+        return export_rows
 
     def account_overview(self, account: AccountRecord) -> AccountOverviewResponse:
         return AccountOverviewResponse(

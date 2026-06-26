@@ -24,12 +24,14 @@ function parseDomains(value) {
 }
 
 function getStatusLabel(status) {
-  return {
-    pass: "Ready",
-    warn: "Needs work",
-    fail: "Broken",
-    info: "Optional",
-  }[status] || "Unknown";
+  return (
+    {
+      pass: "Ready",
+      warn: "Needs work",
+      fail: "Broken",
+      info: "Optional",
+    }[status] || "Unknown"
+  );
 }
 
 function getScoreColor(score) {
@@ -57,7 +59,8 @@ function renderRecentDomains(container, onSelect) {
 
   const items = recentDomains();
   if (!items.length) {
-    container.innerHTML = '<p class="result-empty">Recent test domains will appear here.</p>';
+    container.innerHTML =
+      '<p class="result-empty">Recent test domains will appear here.</p>';
     return;
   }
 
@@ -113,7 +116,7 @@ function renderAudit(target, audit) {
     ? audit.providers
         .map(
           (provider) =>
-            `<span class="provider-chip">${escapeHtml(provider.name)} · ${Math.round(provider.confidence * 100)}%</span>`
+            `<span class="provider-chip">${escapeHtml(provider.name)} · ${Math.round(provider.confidence * 100)}%</span>`,
         )
         .join("")
     : '<p class="result-empty">No provider fingerprint matched the DNS evidence.</p>';
@@ -122,13 +125,19 @@ function renderAudit(target, audit) {
     .map(([name, check]) => {
       const detailBits = [];
       if (check.details?.record) {
-        detailBits.push(`<div><strong>Record:</strong> ${escapeHtml(check.details.record)}</div>`);
+        detailBits.push(
+          `<div><strong>Record:</strong> ${escapeHtml(check.details.record)}</div>`,
+        );
       }
       if (check.details?.policy) {
-        detailBits.push(`<div><strong>Policy:</strong> ${escapeHtml(check.details.policy)}</div>`);
+        detailBits.push(
+          `<div><strong>Policy:</strong> ${escapeHtml(check.details.policy)}</div>`,
+        );
       }
       if (check.details?.records?.length) {
-        detailBits.push(`<div><strong>Found:</strong> ${escapeHtml(check.details.records.join(", "))}</div>`);
+        detailBits.push(
+          `<div><strong>Found:</strong> ${escapeHtml(check.details.records.join(", "))}</div>`,
+        );
       }
       return `
         <article class="check-card">
@@ -147,14 +156,17 @@ function renderAudit(target, audit) {
           (item) =>
             `<li><strong>${escapeHtml(item.severity)}</strong> · ${escapeHtml(item.message)}${
               item.details ? ` <span>${escapeHtml(item.details)}</span>` : ""
-            }</li>`
+            }</li>`,
         )
         .join("")
     : "<li>No urgent remediation items. This domain is in a good place.</li>";
 
   const references = audit.references.length
     ? `<ul>${audit.references
-        .map((reference) => `<li><a href="${escapeHtml(reference)}" target="_blank" rel="noreferrer">${escapeHtml(reference)}</a></li>`)
+        .map(
+          (reference) =>
+            `<li><a href="${escapeHtml(reference)}" target="_blank" rel="noreferrer">${escapeHtml(reference)}</a></li>`,
+        )
         .join("")}</ul>`
     : "<p>No references returned.</p>";
 
@@ -224,7 +236,10 @@ async function runAudit(payload, endpoint = "/demo/audit") {
     try {
       const error = await response.json();
       if (error?.detail) {
-        message = typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail);
+        message =
+          typeof error.detail === "string"
+            ? error.detail
+            : JSON.stringify(error.detail);
       }
     } catch {
       // No extra payload to parse.
@@ -249,7 +264,10 @@ async function runBatchAudit(payload, endpoint) {
     try {
       const error = await response.json();
       if (error?.detail) {
-        message = typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail);
+        message =
+          typeof error.detail === "string"
+            ? error.detail
+            : JSON.stringify(error.detail);
       }
     } catch {
       // No extra payload to parse.
@@ -265,7 +283,9 @@ function initAuditForm(form) {
   const recentTarget = document.getElementById(form.dataset.recentTarget);
   const domainInput = form.querySelector('input[name="domain"]');
   const selectorsInput = form.querySelector('input[name="selectors"]');
-  const expectedProvidersInput = form.querySelector('input[name="expected_providers"]');
+  const expectedProvidersInput = form.querySelector(
+    'input[name="expected_providers"]',
+  );
   const submitButton = form.querySelector('button[type="submit"]');
 
   if (!resultsTarget || !domainInput || !submitButton) return;
@@ -296,7 +316,10 @@ function initAuditForm(form) {
     renderLoadingState(resultsTarget, domain);
 
     try {
-      const audit = await runAudit(payload, form.dataset.endpoint || "/demo/audit");
+      const audit = await runAudit(
+        payload,
+        form.dataset.endpoint || "/demo/audit",
+      );
       saveRecentDomain(audit.domain);
       renderAudit(resultsTarget, audit);
       renderRecentDomains(recentTarget, (recentDomain) => {
@@ -304,7 +327,10 @@ function initAuditForm(form) {
         form.requestSubmit();
       });
     } catch (error) {
-      renderErrorState(resultsTarget, error instanceof Error ? error.message : "Unknown error");
+      renderErrorState(
+        resultsTarget,
+        error instanceof Error ? error.message : "Unknown error",
+      );
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = submitButton.classList.contains("full-width")
@@ -328,8 +354,8 @@ function renderBatchResult(target, payload) {
         .map(
           (item) =>
             `<li><strong>${escapeHtml(item.severity)}</strong> · ${escapeHtml(item.message)} <span>${escapeHtml(
-              item.affected_domains.join(", ")
-            )}</span></li>`
+              item.affected_domains.join(", "),
+            )}</span></li>`,
         )
         .join("")
     : "<li>No repeated remediation patterns were detected.</li>";
@@ -341,11 +367,11 @@ function renderBatchResult(target, payload) {
           <span>${escapeHtml(audit.domain)}</span>
           <span>${escapeHtml(audit.score)}/100</span>
           <span><span class="status-pill status-${escapeHtml(audit.overall_status)}">${getStatusLabel(
-            audit.overall_status
+            audit.overall_status,
           )}</span></span>
           <span>${escapeHtml(audit.checked_at)}</span>
         </div>
-      `
+      `,
     )
     .join("");
 
@@ -389,7 +415,9 @@ function initBatchForm(form) {
   const submitButton = form.querySelector('button[type="submit"]');
   const domainsField = form.querySelector('textarea[name="domains"]');
   const selectorsInput = form.querySelector('input[name="selectors"]');
-  const expectedProvidersInput = form.querySelector('input[name="expected_providers"]');
+  const expectedProvidersInput = form.querySelector(
+    'input[name="expected_providers"]',
+  );
 
   if (!resultsTarget || !submitButton || !domainsField) return;
 
@@ -414,10 +442,16 @@ function initBatchForm(form) {
     renderLoadingState(resultsTarget, `${domains.length} domains`);
 
     try {
-      const result = await runBatchAudit(payload, form.dataset.endpoint || "/v1/audits/batch");
+      const result = await runBatchAudit(
+        payload,
+        form.dataset.endpoint || "/v1/audits/batch",
+      );
       renderBatchResult(resultsTarget, result);
     } catch (error) {
-      renderErrorState(resultsTarget, error instanceof Error ? error.message : "Unknown error");
+      renderErrorState(
+        resultsTarget,
+        error instanceof Error ? error.message : "Unknown error",
+      );
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = "Run Batch Audit";
@@ -426,7 +460,9 @@ function initBatchForm(form) {
 }
 
 function initRevealAnimations() {
-  const items = document.querySelectorAll("[data-reveal], .hero-copy, .hero-panel");
+  const items = document.querySelectorAll(
+    "[data-reveal], .hero-copy, .hero-panel",
+  );
   if (!("IntersectionObserver" in window)) {
     items.forEach((item) => item.classList.add("is-visible"));
     return;
@@ -443,7 +479,7 @@ function initRevealAnimations() {
     },
     {
       threshold: 0.12,
-    }
+    },
   );
 
   items.forEach((item) => observer.observe(item));
@@ -457,7 +493,9 @@ async function initHealthIndicator() {
     const response = await fetch("/healthz");
     if (!response.ok) throw new Error("not ok");
     const payload = await response.json();
-    indicator.innerHTML = '<span class="status-dot ready"></span> API ' + escapeHtml(payload.status);
+    indicator.innerHTML =
+      '<span class="status-dot ready"></span> API ' +
+      escapeHtml(payload.status);
   } catch {
     indicator.innerHTML = '<span class="status-dot"></span> API unavailable';
   }

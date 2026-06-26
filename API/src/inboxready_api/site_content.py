@@ -159,6 +159,92 @@ FAQS = [
     },
 ]
 
+CHANGELOG_ENTRIES = [
+    {
+        "version": "0.3.0",
+        "date": "2026-06-26",
+        "display_date": "June 26, 2026",
+        "status": "Current release",
+        "title": "InboxReady now feels maintained like a product, not a hidden backend.",
+        "summary": (
+            "This release turns saved audits and product updates into visible operating surfaces "
+            "while extending the account workflow for multi-domain reviews."
+        ),
+        "highlights": [
+            "Added a public changelog page, dashboard release card, and landing-page shipping notes.",
+            "Extended the dashboard with authenticated batch audits for customer portfolios and shared usage enforcement.",
+            "Added CSV export and saved-audit JSON views so teams can inspect or move audit history downstream.",
+            "Expanded launch documentation and API metadata so prospects can understand the product state quickly.",
+        ],
+        "impact": (
+            "Best for design partners, support leads, and buyers who want proof that the product is "
+            "shipping and getting safer over time."
+        ),
+    },
+    {
+        "version": "0.2.0",
+        "date": "2026-06-22",
+        "display_date": "June 22, 2026",
+        "status": "Launch surface",
+        "title": "The API grew a real SaaS shell around the audit engine.",
+        "summary": (
+            "InboxReady moved beyond a single endpoint and added the customer-facing surfaces "
+            "needed for onboarding, support, billing, and trust."
+        ),
+        "highlights": [
+            "Added signup, login, session-backed dashboard access, and one-time API key reveal flows.",
+            "Introduced usage metering, saved audit history, Stripe hooks, and support/legal pages.",
+            "Hardened session security with CSRF protection, secure password handling, and defensive headers.",
+        ],
+        "impact": (
+            "Best for early paying customers who need more than a raw API response before they can deploy."
+        ),
+    },
+    {
+        "version": "0.1.0",
+        "date": "2026-04-28",
+        "display_date": "April 28, 2026",
+        "status": "Initial release",
+        "title": "Core domain-readiness auditing shipped.",
+        "summary": (
+            "The initial release established the DNS audit engine and provider detection model "
+            "for sender-domain onboarding."
+        ),
+        "highlights": [
+            "Shipped MX, SPF, DMARC, DKIM, BIMI, MTA-STS, and TLS-RPT checks.",
+            "Added provider fingerprinting, weighted scoring, and remediation recommendations.",
+            "Exposed a clean FastAPI service with versioned endpoints and interactive docs.",
+        ],
+        "impact": "Best for proving the API wedge before layering on accounts and commercial workflows.",
+    },
+]
+
+LATEST_CHANGELOG = CHANGELOG_ENTRIES[0]
+
+ROADMAP_ITEMS = [
+    {
+        "title": "Scheduled re-checks",
+        "body": (
+            "Automatically re-audit customer domains, detect drift, and surface fresh warnings "
+            "before support tickets arrive."
+        ),
+    },
+    {
+        "title": "Webhook alerts",
+        "body": (
+            "Push failed or regressed domain states into product workflows, ticketing systems, "
+            "or internal ops channels."
+        ),
+    },
+    {
+        "title": "Team reporting",
+        "body": (
+            "Give customer success and deliverability teams shared visibility into accounts, "
+            "portfolio trends, and repeated remediation patterns."
+        ),
+    },
+]
+
 SAMPLE_CURL = """curl -X POST https://api.inboxready.dev/v1/audits/email-domain \\
   -H "Authorization: Bearer $INBOXREADY_API_KEY" \\
   -H "Content-Type: application/json" \\

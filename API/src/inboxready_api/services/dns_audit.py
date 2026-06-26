@@ -6,7 +6,6 @@ from email.utils import parseaddr
 
 import dns.exception
 import dns.resolver
-import httpx
 
 from inboxready_api.models import (
     AuditCheck,
@@ -307,6 +306,8 @@ def build_mta_sts_check(domain: str, records: list[str], settings: Settings) -> 
     details["policy_url"] = policy_url
 
     try:
+        import httpx
+
         with httpx.Client(
             timeout=settings.http_timeout_seconds,
             headers={"User-Agent": settings.user_agent},

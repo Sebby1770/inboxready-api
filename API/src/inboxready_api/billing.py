@@ -4,14 +4,14 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Any
-
-import httpx
+from typing import TYPE_CHECKING, Any
 
 from inboxready_api.commerce import normalize_plan
 from inboxready_api.models import PlanName
 from inboxready_api.settings import Settings
-from inboxready_api.storage import AccountRecord, Storage
+
+if TYPE_CHECKING:
+    from inboxready_api.storage import AccountRecord, Storage
 
 
 STRIPE_API = "https://api.stripe.com/v1"
@@ -47,7 +47,7 @@ def plan_for_price_id(settings: Settings, price_id: str | None) -> PlanName:
     return "free"
 
 
-def create_checkout_session(settings: Settings, account: AccountRecord, plan: PlanName) -> str:
+def create_checkout_session(settings: Settings, account: "AccountRecord", plan: PlanName) -> str:
     if not settings.stripe_secret_key:
         raise BillingConfigurationError("Stripe secret key is not configured.")
 
@@ -79,7 +79,7 @@ def create_checkout_session(settings: Settings, account: AccountRecord, plan: Pl
     return url
 
 
-def create_portal_session(settings: Settings, account: AccountRecord) -> str:
+def create_portal_session(settings: Settings, account: "AccountRecord") -> str:
     if not settings.stripe_secret_key:
         raise BillingConfigurationError("Stripe secret key is not configured.")
     if not account.stripe_customer_id:
@@ -100,6 +100,8 @@ def create_portal_session(settings: Settings, account: AccountRecord) -> str:
 
 
 def stripe_post(settings: Settings, path: str, data: dict[str, str]) -> dict[str, Any]:
+    import httpx
+
     with httpx.Client(timeout=10.0) as client:
         response = client.post(
             f"{STRIPE_API}{path}",
@@ -149,7 +151,7 @@ def verify_stripe_signature(
 def handle_stripe_webhook(
     *,
     settings: Settings,
-    storage: Storage,
+    storage: "Storage",
     payload: bytes,
     signature_header: str | None,
 ) -> dict[str, str]:
@@ -170,7 +172,7 @@ def handle_stripe_webhook(
     return {"received": "true"}
 
 
-def handle_checkout_completed(settings: Settings, storage: Storage, obj: dict[str, Any]) -> None:
+def handle_checkout_completed(settings: Settings, storage: "Storage", obj: dict[str, Any]) -> None:
     account_id = obj.get("metadata", {}).get("account_id")
     if not account_id:
         return
@@ -189,7 +191,7 @@ def handle_checkout_completed(settings: Settings, storage: Storage, obj: dict[st
 
 def handle_subscription_change(
     settings: Settings,
-    storage: Storage,
+    storage: "Storage",
     obj: dict[str, Any],
     *,
     deleted: bool,

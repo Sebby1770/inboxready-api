@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import csv
+from io import StringIO
 from pathlib import Path
 import secrets
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -28,6 +30,7 @@ from inboxready_api.models import (
     ApiKeyListResponse,
     ApiKeyProvisionResponse,
     ApiKeyResponse,
+    AuditHistoryDetailResponse,
     AuditHistoryResponse,
     BatchAuditRequest,
     BatchAuditResponse,
@@ -42,10 +45,13 @@ from inboxready_api.models import (
 )
 from inboxready_api.security import hash_password, validate_password
 from inboxready_api.site_content import (
+    CHANGELOG_ENTRIES,
     FAQS,
     FLOW_STEPS,
     HERO_METRICS,
+    LATEST_CHANGELOG,
     PRICING_TIERS,
+    ROADMAP_ITEMS,
     SAMPLE_CURL,
     SAMPLE_JS,
     SIGNAL_STRIPS,
@@ -65,6 +71,19 @@ from inboxready_api.storage import (
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+CSV_FIELDNAMES = [
+    "id",
+    "domain",
+    "score",
+    "overall_status",
+    "units",
+    "provider_names",
+    "recommendation_count",
+    "top_recommendation",
+    "checked_at",
+    "created_at",
+]
 
 app = FastAPI(
     title="InboxReady API",
@@ -261,6 +280,19 @@ def usage_http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Unknown usage error.")
 
 
+def audit_history_csv_response(account: AccountRecord, *, filename: str) -> Response:
+    rows = storage().audit_history_export_rows(account)
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=CSV_FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 def render_page(
     request: Request,
     *,
@@ -282,6 +314,10 @@ def render_page(
         "flow_steps": FLOW_STEPS,
         "pricing_tiers": PRICING_TIERS,
         "faqs": FAQS,
+        "changelog_entries": CHANGELOG_ENTRIES,
+        "changelog_preview": CHANGELOG_ENTRIES[:3],
+        "latest_release": LATEST_CHANGELOG,
+        "roadmap_items": ROADMAP_ITEMS,
         "sample_curl": SAMPLE_CURL,
         "sample_js": SAMPLE_JS,
         "provider_catalog": get_provider_catalog(),
@@ -613,6 +649,16 @@ async def support_submit(request: Request) -> HTMLResponse | RedirectResponse:
     return redirect("/support")
 
 
+@app.get("/changelog", response_class=HTMLResponse)
+def changelog_page(request: Request) -> HTMLResponse:
+    return render_page(
+        request,
+        name="changelog.html",
+        page_title="Changelog",
+        page_description="Track InboxReady product updates, release notes, and near-term roadmap items.",
+    )
+
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request) -> HTMLResponse:
     return render_page(
@@ -635,6 +681,32 @@ def terms_page(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/dashboard/audit-history.csv", response_class=Response, response_model=None)
+def dashboard_audit_history_csv(request: Request) -> Response | RedirectResponse:
+    account = current_account_from_session(request)
+    if account is None:
+        return redirect_to_login("/dashboard")
+    return audit_history_csv_response(account, filename="inboxready-audit-history.csv")
+
+
+@app.get(
+    "/dashboard/audit-history/{audit_id}.json",
+    response_model=AuditHistoryDetailResponse,
+)
+def dashboard_audit_history_detail(
+    audit_id: str,
+    request: Request,
+) -> AuditHistoryDetailResponse | RedirectResponse:
+    account = current_account_from_session(request)
+    if account is None:
+        return redirect_to_login("/dashboard")
+
+    detail = storage().audit_detail(account, audit_id=audit_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Audit log not found.")
+    return detail
+
+
 @app.get("/api")
 def api_root() -> dict[str, object]:
     return {
@@ -644,8 +716,14 @@ def api_root() -> dict[str, object]:
         "workspace": "/app",
         "dashboard": "/dashboard",
         "support": "/support",
+        "changelog": "/changelog",
         "health": "/healthz",
         "readiness": "/readyz",
+        "latest_release": {
+            "version": LATEST_CHANGELOG["version"],
+            "date": LATEST_CHANGELOG["date"],
+            "title": LATEST_CHANGELOG["title"],
+        },
     }
 
 
@@ -734,6 +812,24 @@ def get_audit_history(
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> AuditHistoryResponse:
     return storage().audit_history(context.account, limit=limit)
+
+
+@app.get("/v1/audit-history.csv", response_class=Response)
+def get_audit_history_csv(
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> Response:
+    return audit_history_csv_response(context.account, filename="inboxready-audit-history.csv")
+
+
+@app.get("/v1/audit-history/{audit_id}", response_model=AuditHistoryDetailResponse)
+def get_audit_history_detail(
+    audit_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> AuditHistoryDetailResponse:
+    detail = storage().audit_detail(context.account, audit_id=audit_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Audit log not found.")
+    return detail
 
 
 @app.get("/v1/providers", response_model=ProviderCatalogResponse)
