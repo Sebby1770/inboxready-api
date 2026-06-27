@@ -64,6 +64,107 @@
       </div>
     </section>
 
+    <section class="panel" id="monitors" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Domain monitors</p>
+          <h2>Keep important customer domains on watch</h2>
+        </div>
+        <span class="panel-badge">{{ monitors|length }} active</span>
+      </div>
+
+      <form
+        method="post"
+        action="/dashboard/monitors"
+        class="audit-form monitor-form"
+      >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>
+          Domain
+          <input
+            name="domain"
+            type="text"
+            placeholder="customer-example.com"
+            required
+          />
+        </label>
+        <label>
+          Cadence
+          <select name="cadence">
+            <option value="weekly" selected>Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="manual">Manual</option>
+          </select>
+        </label>
+        <label>
+          DKIM selectors
+          <input name="selectors" type="text" placeholder="google, selector1" />
+        </label>
+        <label>
+          Expected providers
+          <input
+            name="expected_providers"
+            type="text"
+            placeholder="Google Workspace, SendGrid"
+          />
+        </label>
+        <div class="form-actions">
+          <button class="button" type="submit">Add Monitor</button>
+          <a class="button button-secondary" href="/changelog">View Release Notes</a>
+        </div>
+      </form>
+
+      {% if monitors %}
+      <div class="monitor-list">
+        {% for monitor in monitors %}
+        <article class="monitor-card">
+          <div class="monitor-copy">
+            <strong>{{ monitor.domain }}</strong>
+            <p>
+              {{ monitor.cadence|capitalize }}
+              {% if monitor.selectors %}
+                · selectors: {{ monitor.selectors|join(', ') }}
+              {% endif %}
+              {% if monitor.expected_providers %}
+                · expected: {{ monitor.expected_providers|join(', ') }}
+              {% endif %}
+            </p>
+          </div>
+          <div class="monitor-state">
+            {% if monitor.last_score is not none %}
+              <span class="monitor-score">{{ monitor.last_score }}/100</span>
+              <span class="status-pill status-{{ monitor.last_status }}">
+                {{ monitor.last_status }}
+              </span>
+              <span class="monitor-date">{{ monitor.last_checked_at }}</span>
+            {% else %}
+              <span class="result-note">Not checked yet</span>
+            {% endif %}
+          </div>
+          <div class="monitor-actions">
+            <form method="post" action="/dashboard/monitors/{{ monitor.id }}/run">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+              <button class="button button-secondary button-small" type="submit">
+                Run Now
+              </button>
+            </form>
+            <form method="post" action="/dashboard/monitors/{{ monitor.id }}/delete">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+              <button class="button button-ghost button-small" type="submit">
+                Remove
+              </button>
+            </form>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="result-empty">
+        Add domains you want to revisit regularly. Running a monitor consumes one audit unit and updates this watchlist.
+      </div>
+      {% endif %}
+    </section>
+
     <section class="panel" data-reveal>
       <div class="panel-header">
         <div>

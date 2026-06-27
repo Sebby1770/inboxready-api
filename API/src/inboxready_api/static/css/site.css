@@ -634,6 +634,7 @@ textarea {
 }
 
 .audit-form input,
+.audit-form select,
 .account-form input,
 .account-form select,
 .account-result textarea {
@@ -657,6 +658,7 @@ textarea {
 }
 
 .audit-form input:focus,
+.audit-form select:focus,
 .account-form input:focus,
 .account-form select:focus,
 .account-result textarea:focus {
@@ -1100,6 +1102,64 @@ textarea {
   margin-top: 0.85rem;
 }
 
+.monitor-form {
+  margin-bottom: 1rem;
+}
+
+.monitor-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.monitor-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(180px, 0.8fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(22, 36, 58, 0.08);
+}
+
+.monitor-copy strong,
+.monitor-score {
+  display: block;
+  font-family: var(--display-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.monitor-copy p,
+.monitor-date {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.monitor-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.monitor-state .status-pill {
+  margin-top: 0;
+}
+
+.monitor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.monitor-actions form {
+  margin: 0;
+}
+
 .billing-form,
 .compact-form {
   margin: 0;
@@ -1345,9 +1405,14 @@ textarea {
   .check-grid,
   .report-top,
   .history-row,
+  .monitor-card,
   .changelog-entry,
   .changelog-featured {
     grid-template-columns: 1fr;
+  }
+
+  .monitor-actions {
+    justify-content: flex-start;
   }
 
   .audit-form label:last-of-type,

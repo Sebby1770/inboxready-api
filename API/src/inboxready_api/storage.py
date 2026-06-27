@@ -19,8 +19,12 @@ from inboxready_api.models import (
     AuditHistoryItem,
     AuditHistoryResponse,
     DomainAuditResponse,
+    MonitorCadence,
+    MonitorListResponse,
+    MonitorResponse,
     PlanName,
     PlanUsageResponse,
+    Status,
 )
 from inboxready_api.security import verify_password
 from inboxready_api.settings import Settings
@@ -64,6 +68,22 @@ class ApiKeyRecord:
 
 
 @dataclass(frozen=True)
+class MonitorRecord:
+    id: str
+    account_id: str
+    domain: str
+    selectors: list[str]
+    expected_providers: list[str]
+    cadence: MonitorCadence
+    last_audit_id: str | None
+    last_score: int | None
+    last_status: Status | None
+    last_checked_at: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
 class AuthContext:
     account: AccountRecord
     api_key: ApiKeyRecord | None
@@ -74,6 +94,10 @@ class DuplicateAccountError(Exception):
 
 
 class AuthenticationError(Exception):
+    pass
+
+
+class DuplicateMonitorError(Exception):
     pass
 
 
@@ -145,10 +169,28 @@ class Storage:
                   created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS domain_monitors (
+                  id TEXT PRIMARY KEY,
+                  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                  domain TEXT NOT NULL,
+                  selectors_json TEXT NOT NULL DEFAULT '[]',
+                  expected_providers_json TEXT NOT NULL DEFAULT '[]',
+                  cadence TEXT NOT NULL DEFAULT 'weekly',
+                  last_audit_log_id TEXT REFERENCES audit_logs(id) ON DELETE SET NULL,
+                  last_score INTEGER,
+                  last_status TEXT,
+                  last_checked_at TEXT,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  UNIQUE(account_id, domain)
+                );
+
                 CREATE INDEX IF NOT EXISTS audit_logs_account_created_idx
                   ON audit_logs(account_id, created_at);
                 CREATE INDEX IF NOT EXISTS rate_events_identifier_created_idx
                   ON rate_events(identifier, created_at);
+                CREATE INDEX IF NOT EXISTS domain_monitors_account_updated_idx
+                  ON domain_monitors(account_id, updated_at);
                 """
             )
             self._ensure_column(conn, "accounts", "password_hash", "TEXT")
@@ -350,8 +392,9 @@ class Storage:
         api_key_id: str | None,
         audit: DomainAuditResponse,
         units: int = 1,
-    ) -> None:
+    ) -> str:
         self.init_schema()
+        audit_id = str(uuid.uuid4())
         with self.connect() as conn:
             conn.execute(
                 """
@@ -362,7 +405,7 @@ class Storage:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    str(uuid.uuid4()),
+                    audit_id,
                     account_id,
                     api_key_id,
                     audit.domain,
@@ -373,6 +416,7 @@ class Storage:
                     utc_now(),
                 ),
             )
+        return audit_id
 
     def update_billing(
         self,
@@ -515,6 +559,117 @@ class Storage:
             )
         return export_rows
 
+    def create_monitor(
+        self,
+        *,
+        account_id: str,
+        domain: str,
+        selectors: list[str] | None = None,
+        expected_providers: list[str] | None = None,
+        cadence: MonitorCadence = "weekly",
+    ) -> MonitorRecord:
+        self.init_schema()
+        monitor_id = str(uuid.uuid4())
+        now = utc_now()
+        with self.connect() as conn:
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO domain_monitors (
+                      id, account_id, domain, selectors_json, expected_providers_json,
+                      cadence, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        monitor_id,
+                        account_id,
+                        domain,
+                        json.dumps(selectors or []),
+                        json.dumps(expected_providers or []),
+                        cadence,
+                        now,
+                        now,
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise DuplicateMonitorError("That domain is already on this account watchlist.") from exc
+
+        monitor = self.get_monitor(account_id=account_id, monitor_id=monitor_id)
+        if monitor is None:
+            raise RuntimeError("Monitor creation failed.")
+        return monitor
+
+    def list_monitors(self, account_id: str) -> list[MonitorRecord]:
+        self.init_schema()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM domain_monitors
+                WHERE account_id = ?
+                ORDER BY updated_at DESC
+                """,
+                (account_id,),
+            ).fetchall()
+        return [self._monitor_from_row(row) for row in rows]
+
+    def get_monitor(self, *, account_id: str, monitor_id: str) -> MonitorRecord | None:
+        self.init_schema()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM domain_monitors
+                WHERE account_id = ? AND id = ?
+                """,
+                (account_id, monitor_id),
+            ).fetchone()
+        return self._monitor_from_row(row) if row else None
+
+    def delete_monitor(self, *, account_id: str, monitor_id: str) -> MonitorRecord | None:
+        self.init_schema()
+        monitor = self.get_monitor(account_id=account_id, monitor_id=monitor_id)
+        if monitor is None:
+            return None
+        with self.connect() as conn:
+            conn.execute(
+                "DELETE FROM domain_monitors WHERE account_id = ? AND id = ?",
+                (account_id, monitor_id),
+            )
+        return monitor
+
+    def update_monitor_after_audit(
+        self,
+        *,
+        account_id: str,
+        monitor_id: str,
+        audit: DomainAuditResponse,
+        audit_log_id: str,
+    ) -> MonitorRecord | None:
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE domain_monitors
+                SET last_audit_log_id = ?,
+                    last_score = ?,
+                    last_status = ?,
+                    last_checked_at = ?,
+                    updated_at = ?
+                WHERE account_id = ? AND id = ?
+                """,
+                (
+                    audit_log_id,
+                    audit.score,
+                    audit.overall_status,
+                    audit.checked_at,
+                    now,
+                    account_id,
+                    monitor_id,
+                ),
+            )
+        return self.get_monitor(account_id=account_id, monitor_id=monitor_id)
+
     def account_overview(self, account: AccountRecord) -> AccountOverviewResponse:
         return AccountOverviewResponse(
             account=self.account_response(account),
@@ -525,6 +680,11 @@ class Storage:
     def api_key_list(self, account: AccountRecord) -> ApiKeyListResponse:
         return ApiKeyListResponse(
             keys=[self.api_key_response(item) for item in self.list_api_keys(account.id)],
+        )
+
+    def monitor_list(self, account: AccountRecord) -> MonitorListResponse:
+        return MonitorListResponse(
+            monitors=[self.monitor_response(item) for item in self.list_monitors(account.id)],
         )
 
     def create_support_request(
@@ -572,6 +732,21 @@ class Storage:
             revoked_at=api_key.revoked_at,
         )
 
+    def monitor_response(self, monitor: MonitorRecord) -> MonitorResponse:
+        return MonitorResponse(
+            id=monitor.id,
+            domain=monitor.domain,
+            selectors=monitor.selectors,
+            expected_providers=monitor.expected_providers,
+            cadence=monitor.cadence,
+            last_audit_id=monitor.last_audit_id,
+            last_score=monitor.last_score,
+            last_status=monitor.last_status,
+            last_checked_at=monitor.last_checked_at,
+            created_at=monitor.created_at,
+            updated_at=monitor.updated_at,
+        )
+
     def _account_from_row(self, row: sqlite3.Row) -> AccountRecord:
         return AccountRecord(
             id=row["id"],
@@ -596,6 +771,22 @@ class Storage:
             revoked_at=row["revoked_at"],
         )
 
+    def _monitor_from_row(self, row: sqlite3.Row) -> MonitorRecord:
+        return MonitorRecord(
+            id=row["id"],
+            account_id=row["account_id"],
+            domain=row["domain"],
+            selectors=_decode_string_list(row["selectors_json"]),
+            expected_providers=_decode_string_list(row["expected_providers_json"]),
+            cadence=_normalize_monitor_cadence(row["cadence"]),
+            last_audit_id=row["last_audit_log_id"],
+            last_score=row["last_score"],
+            last_status=_normalize_status(row["last_status"]) if row["last_status"] else None,
+            last_checked_at=row["last_checked_at"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
     def _ensure_column(
         self,
         conn: sqlite3.Connection,
@@ -611,3 +802,25 @@ class Storage:
 
 def decode_audit_response(raw_json: str) -> DomainAuditResponse:
     return DomainAuditResponse(**json.loads(raw_json))
+
+
+def _decode_string_list(raw_json: str) -> list[str]:
+    try:
+        value = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _normalize_monitor_cadence(value: str) -> MonitorCadence:
+    if value in {"manual", "weekly", "monthly"}:
+        return value
+    return "weekly"
+
+
+def _normalize_status(value: str) -> Status:
+    if value in {"pass", "warn", "fail", "info"}:
+        return value
+    return "info"

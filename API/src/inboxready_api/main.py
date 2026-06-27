@@ -38,6 +38,10 @@ from inboxready_api.models import (
     BillingSessionResponse,
     DomainAuditRequest,
     DomainAuditResponse,
+    MonitorCreateRequest,
+    MonitorListResponse,
+    MonitorResponse,
+    MonitorRunResponse,
     PlanUsageResponse,
     ProviderCatalogResponse,
     SupportRequestCreateRequest,
@@ -66,6 +70,8 @@ from inboxready_api.storage import (
     AuthContext,
     AuthenticationError,
     DuplicateAccountError,
+    DuplicateMonitorError,
+    MonitorRecord,
     Storage,
 )
 
@@ -293,6 +299,42 @@ def audit_history_csv_response(account: AccountRecord, *, filename: str) -> Resp
     )
 
 
+def split_csvish(value: str) -> list[str]:
+    return [item.strip() for item in value.replace("\n", ",").split(",") if item.strip()]
+
+
+def perform_monitor_audit(
+    *,
+    account: AccountRecord,
+    monitor: MonitorRecord,
+    api_key_id: str | None,
+) -> MonitorRunResponse:
+    request = DomainAuditRequest(
+        domain=monitor.domain,
+        selectors=monitor.selectors,
+        expected_providers=monitor.expected_providers,
+    )
+    result = audit_domain(request, get_settings())
+    store = storage()
+    audit_id = store.log_audit(
+        account_id=account.id,
+        api_key_id=api_key_id,
+        audit=result,
+    )
+    updated_monitor = store.update_monitor_after_audit(
+        account_id=account.id,
+        monitor_id=monitor.id,
+        audit=result,
+        audit_log_id=audit_id,
+    )
+    if updated_monitor is None:
+        raise HTTPException(status_code=404, detail="Monitor not found.")
+    return MonitorRunResponse(
+        monitor=store.monitor_response(updated_monitor),
+        audit=result,
+    )
+
+
 def render_page(
     request: Request,
     *,
@@ -493,6 +535,7 @@ def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
             "dashboard_account": account,
             "usage": store.usage_response(account),
             "audit_history": store.audit_history(account, limit=50),
+            "monitors": store.list_monitors(account.id),
             "api_keys": store.list_api_keys(account.id),
             "one_time_api_key": pop_one_time_api_key(request),
         },
@@ -529,6 +572,86 @@ def dashboard_batch_audit(request: BatchAuditRequest, http_request: Request) -> 
     for audit in result.audits:
         storage().log_audit(account_id=account.id, api_key_id=None, audit=audit)
     return result
+
+
+@app.post("/dashboard/monitors")
+async def dashboard_create_monitor(request: Request) -> RedirectResponse:
+    account = current_account_from_session(request)
+    if account is None:
+        return redirect_to_login("/dashboard")
+
+    form = await request.form()
+    require_csrf_token(request, str(form.get("csrf_token") or ""))
+
+    try:
+        payload = MonitorCreateRequest(
+            domain=str(form.get("domain") or ""),
+            selectors=split_csvish(str(form.get("selectors") or "")),
+            expected_providers=split_csvish(str(form.get("expected_providers") or "")),
+            cadence=str(form.get("cadence") or "weekly"),
+        )
+        monitor = storage().create_monitor(
+            account_id=account.id,
+            domain=payload.domain,
+            selectors=payload.selectors,
+            expected_providers=payload.expected_providers,
+            cadence=payload.cadence,
+        )
+    except DuplicateMonitorError as exc:
+        set_flash(request, "error", str(exc))
+        return redirect("/dashboard#monitors")
+    except Exception as exc:
+        set_flash(request, "error", f"Monitor could not be created: {exc}")
+        return redirect("/dashboard#monitors")
+
+    set_flash(request, "success", f"Added {monitor.domain} to the monitor watchlist.")
+    return redirect("/dashboard#monitors")
+
+
+@app.post("/dashboard/monitors/{monitor_id}/run")
+async def dashboard_run_monitor(monitor_id: str, request: Request) -> RedirectResponse:
+    account = current_account_from_session(request)
+    if account is None:
+        return redirect_to_login("/dashboard")
+
+    form = await request.form()
+    require_csrf_token(request, str(form.get("csrf_token") or ""))
+    store = storage()
+    monitor = store.get_monitor(account_id=account.id, monitor_id=monitor_id)
+    if monitor is None:
+        set_flash(request, "error", "Monitor not found.")
+        return redirect("/dashboard#monitors")
+
+    context = AuthContext(account=account, api_key=None)
+    try:
+        enforce_api_usage(context, units=1)
+        result = perform_monitor_audit(account=account, monitor=monitor, api_key_id=None)
+    except (UsageLimitError, RateLimitError) as exc:
+        set_flash(request, "error", str(exc))
+        return redirect("/dashboard#monitors")
+
+    set_flash(
+        request,
+        "success",
+        f"Refreshed {monitor.domain}: score {result.audit.score}/100.",
+    )
+    return redirect("/dashboard#monitors")
+
+
+@app.post("/dashboard/monitors/{monitor_id}/delete")
+async def dashboard_delete_monitor(monitor_id: str, request: Request) -> RedirectResponse:
+    account = current_account_from_session(request)
+    if account is None:
+        return redirect_to_login("/dashboard")
+
+    form = await request.form()
+    require_csrf_token(request, str(form.get("csrf_token") or ""))
+    removed = storage().delete_monitor(account_id=account.id, monitor_id=monitor_id)
+    if removed is None:
+        set_flash(request, "error", "Monitor not found.")
+    else:
+        set_flash(request, "success", f"Removed {removed.domain} from the watchlist.")
+    return redirect("/dashboard#monitors")
 
 
 @app.post("/dashboard/api-keys")
@@ -719,6 +842,7 @@ def api_root() -> dict[str, object]:
         "changelog": "/changelog",
         "health": "/healthz",
         "readiness": "/readyz",
+        "monitors": "/v1/monitors",
         "latest_release": {
             "version": LATEST_CHANGELOG["version"],
             "date": LATEST_CHANGELOG["date"],
@@ -830,6 +954,63 @@ def get_audit_history_detail(
     if detail is None:
         raise HTTPException(status_code=404, detail="Audit log not found.")
     return detail
+
+
+@app.post("/v1/monitors", response_model=MonitorResponse)
+def create_monitor(
+    request: MonitorCreateRequest,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> MonitorResponse:
+    try:
+        monitor = storage().create_monitor(
+            account_id=context.account.id,
+            domain=request.domain,
+            selectors=request.selectors,
+            expected_providers=request.expected_providers,
+            cadence=request.cadence,
+        )
+    except DuplicateMonitorError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return storage().monitor_response(monitor)
+
+
+@app.get("/v1/monitors", response_model=MonitorListResponse)
+def list_monitors(
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> MonitorListResponse:
+    return storage().monitor_list(context.account)
+
+
+@app.post("/v1/monitors/{monitor_id}/run", response_model=MonitorRunResponse)
+def run_monitor(
+    monitor_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> MonitorRunResponse:
+    store = storage()
+    monitor = store.get_monitor(account_id=context.account.id, monitor_id=monitor_id)
+    if monitor is None:
+        raise HTTPException(status_code=404, detail="Monitor not found.")
+
+    try:
+        enforce_api_usage(context, units=1)
+    except (UsageLimitError, RateLimitError) as exc:
+        raise usage_http_error(exc) from exc
+    return perform_monitor_audit(
+        account=context.account,
+        monitor=monitor,
+        api_key_id=context.api_key.id if context.api_key else None,
+    )
+
+
+@app.delete("/v1/monitors/{monitor_id}", response_model=MonitorResponse)
+def delete_monitor(
+    monitor_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> MonitorResponse:
+    monitor = storage().delete_monitor(account_id=context.account.id, monitor_id=monitor_id)
+    if monitor is None:
+        raise HTTPException(status_code=404, detail="Monitor not found.")
+    return storage().monitor_response(monitor)
 
 
 @app.get("/v1/providers", response_model=ProviderCatalogResponse)

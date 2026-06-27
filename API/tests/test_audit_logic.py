@@ -133,7 +133,7 @@ def test_changelog_page_renders() -> None:
 
     assert response.status_code == 200
     assert "Track what changed" in response.text
-    assert "v0.3.0" in response.text
+    assert "v0.4.0" in response.text
     assert "Roadmap" in response.text
 
 
@@ -345,7 +345,8 @@ def test_api_root_exposes_changelog_metadata() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["changelog"] == "/changelog"
-    assert payload["latest_release"]["version"] == "0.3.0"
+    assert payload["monitors"] == "/v1/monitors"
+    assert payload["latest_release"]["version"] == "0.4.0"
 
 
 def test_account_usage_and_history_are_metered(monkeypatch) -> None:
@@ -387,6 +388,64 @@ def test_account_usage_and_history_are_metered(monkeypatch) -> None:
     assert "text/csv" in csv_export.headers["content-type"]
     assert "domain,score,overall_status" in csv_export.text
     assert "example.com" in csv_export.text
+
+
+def test_monitors_can_be_created_run_and_deleted(monkeypatch) -> None:
+    def fake_audit_domain(request, settings):
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=83,
+            overall_status="warn",
+            checked_at="2026-06-27T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domain", fake_audit_domain)
+    api_key = provision_api_key()
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    created = client.post(
+        "/v1/monitors",
+        headers=headers,
+        json={
+            "domain": "https://Customer-Example.com/setup",
+            "selectors": ["google"],
+            "expected_providers": ["Google Workspace"],
+            "cadence": "weekly",
+        },
+    )
+
+    assert created.status_code == 200
+    monitor = created.json()
+    assert monitor["domain"] == "customer-example.com"
+    assert monitor["last_score"] is None
+
+    listed = client.get("/v1/monitors", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["monitors"][0]["id"] == monitor["id"]
+
+    run = client.post(f"/v1/monitors/{monitor['id']}/run", headers=headers)
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["audit"]["score"] == 83
+    assert payload["monitor"]["last_score"] == 83
+    assert payload["monitor"]["last_status"] == "warn"
+    assert payload["monitor"]["last_audit_id"]
+
+    history = client.get("/v1/audit-history", headers=headers)
+    assert history.status_code == 200
+    assert history.json()["audits"][0]["domain"] == "customer-example.com"
+
+    deleted = client.delete(f"/v1/monitors/{monitor['id']}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json()["domain"] == "customer-example.com"
+
+    empty = client.get("/v1/monitors", headers=headers)
+    assert empty.status_code == 200
+    assert empty.json()["monitors"] == []
 
 
 def test_demo_endpoint_does_not_require_api_key(monkeypatch) -> None:
@@ -434,6 +493,46 @@ def test_signup_creates_session_and_dashboard_access() -> None:
     assert email in dashboard.text
     assert "Store this API key now" in dashboard.text
     assert "/dashboard/audit-history.csv" in dashboard.text
+    assert "Domain monitors" in dashboard.text
+
+
+def test_dashboard_monitor_form_creates_watchlist() -> None:
+    browser = TestClient(app)
+    email = f"monitor-dashboard-{uuid4()}@example.com"
+    signup_token = csrf_token(browser, "/signup")
+    signup = browser.post(
+        "/signup",
+        data={
+            "csrf_token": signup_token,
+            "email": email,
+            "password": "LaunchPass123",
+            "key_name": "Dashboard key",
+            "next": "/dashboard",
+        },
+        follow_redirects=False,
+    )
+    assert signup.status_code == 303
+
+    dashboard_token = csrf_token(browser, "/dashboard")
+    response = browser.post(
+        "/dashboard/monitors",
+        data={
+            "csrf_token": dashboard_token,
+            "domain": "https://dashboard-monitor.example/path",
+            "selectors": "google, selector1",
+            "expected_providers": "Google Workspace",
+            "cadence": "monthly",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard#monitors"
+
+    dashboard = browser.get("/dashboard")
+    assert dashboard.status_code == 200
+    assert "dashboard-monitor.example" in dashboard.text
+    assert "Monthly" in dashboard.text
 
 
 def test_dashboard_redirects_when_not_logged_in() -> None:

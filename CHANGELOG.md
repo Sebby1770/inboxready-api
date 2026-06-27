@@ -2,6 +2,24 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 0.4.0 - 2026-06-27
+
+### Added
+
+- Account-level domain monitors for keeping customer senders on a watchlist.
+- Monitor REST endpoints:
+  - `POST /v1/monitors`
+  - `GET /v1/monitors`
+  - `POST /v1/monitors/{monitor_id}/run`
+  - `DELETE /v1/monitors/{monitor_id}`
+- Dashboard monitor controls for adding, refreshing, and removing watched domains.
+- Monitor persistence for cadence, DKIM selectors, expected providers, last score, last status, and last checked time.
+
+### Improved
+
+- Monitor runs now consume normal audit usage and save results to audit history.
+- API metadata now advertises the monitor surface.
+
 ## 0.3.0 - 2026-06-26
 
 ### Added

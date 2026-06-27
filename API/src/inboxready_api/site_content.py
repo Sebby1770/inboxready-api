@@ -161,10 +161,31 @@ FAQS = [
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "0.4.0",
+        "date": "2026-06-27",
+        "display_date": "June 27, 2026",
+        "status": "Current release",
+        "title": "InboxReady now tracks domains instead of only auditing them once.",
+        "summary": (
+            "This release adds account-level domain monitors so teams can keep important "
+            "customer senders on a watchlist and refresh their readiness when needed."
+        ),
+        "highlights": [
+            "Added monitor create, list, run, and delete endpoints for API customers.",
+            "Added dashboard monitor forms with last score, status, checked time, and run-now controls.",
+            "Persisted monitor cadence, selectors, expected providers, and latest audit metadata in SQLite.",
+            "Connected monitor runs to the existing usage meter and saved audit history.",
+        ],
+        "impact": (
+            "Best for support and success teams that need repeatable follow-up on customer "
+            "domains instead of one-off DNS checks."
+        ),
+    },
+    {
         "version": "0.3.0",
         "date": "2026-06-26",
         "display_date": "June 26, 2026",
-        "status": "Current release",
+        "status": "History exports",
         "title": "InboxReady now feels maintained like a product, not a hidden backend.",
         "summary": (
             "This release turns saved audits and product updates into visible operating surfaces "
@@ -223,10 +244,10 @@ LATEST_CHANGELOG = CHANGELOG_ENTRIES[0]
 
 ROADMAP_ITEMS = [
     {
-        "title": "Scheduled re-checks",
+        "title": "Automated schedule execution",
         "body": (
-            "Automatically re-audit customer domains, detect drift, and surface fresh warnings "
-            "before support tickets arrive."
+            "Run stored weekly and monthly monitors without a manual button press, then surface "
+            "fresh warnings before support tickets arrive."
         ),
     },
     {

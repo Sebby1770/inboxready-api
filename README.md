@@ -10,6 +10,7 @@ It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI, detects likely sendi
 - Canonical domain validation and concurrent batch execution
 - SQLite-backed launch accounts, usage metering, rate limits, and audit history
 - Audit history CSV exports and full saved-audit JSON detail views
+- Account-level domain monitors with run-now checks and last-known status
 - API-key listing and revocation for credential hygiene
 - Stripe Checkout, Billing Portal, and webhook routes for paid plans
 - Product release notes in [`CHANGELOG.md`](./CHANGELOG.md) and at `/changelog`

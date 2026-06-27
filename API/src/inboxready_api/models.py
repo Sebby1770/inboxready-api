@@ -104,6 +104,57 @@ class BatchAuditResponse(BaseModel):
     summary: BatchAuditSummary
 
 
+MonitorCadence = Literal["manual", "weekly", "monthly"]
+
+
+class MonitorCreateRequest(BaseModel):
+    domain: str = Field(
+        min_length=1,
+        max_length=2048,
+        description="The customer domain or URL to keep on the account watchlist.",
+    )
+    selectors: list[str] = Field(
+        default_factory=list,
+        description="Optional DKIM selectors to re-use whenever this monitor runs.",
+    )
+    expected_providers: list[str] = Field(
+        default_factory=list,
+        description="Optional provider names expected whenever this monitor runs.",
+    )
+    cadence: MonitorCadence = Field(
+        default="weekly",
+        description="Requested check cadence. The launch build stores this for scheduling.",
+    )
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str) -> str:
+        return normalize_domain(value)
+
+
+class MonitorResponse(BaseModel):
+    id: str
+    domain: str
+    selectors: list[str] = Field(default_factory=list)
+    expected_providers: list[str] = Field(default_factory=list)
+    cadence: MonitorCadence
+    last_audit_id: str | None = None
+    last_score: int | None = Field(default=None, ge=0, le=100)
+    last_status: Status | None = None
+    last_checked_at: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class MonitorListResponse(BaseModel):
+    monitors: list[MonitorResponse] = Field(default_factory=list)
+
+
+class MonitorRunResponse(BaseModel):
+    monitor: MonitorResponse
+    audit: DomainAuditResponse
+
+
 class ProviderCatalogResponse(BaseModel):
     providers: list[ProviderMatch]
 

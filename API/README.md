@@ -27,6 +27,7 @@ InboxReady turns that into one API call.
 - Authenticated dashboard at `/dashboard`
 - SQLite-backed launch accounts and API keys
 - Per-key usage metering, rate limiting, and saved audit history
+- Account-level domain monitors with run-now checks and last-known status
 - Stripe Checkout, Billing Portal, and webhook endpoints for paid plans
 - Support page plus launch-ready privacy and terms pages
 - Public changelog page and repository-level release notes
@@ -61,6 +62,10 @@ InboxReady turns that into one API call.
 - `GET /v1/audit-history`
 - `GET /v1/audit-history.csv`
 - `GET /v1/audit-history/{audit_id}`
+- `POST /v1/monitors`
+- `GET /v1/monitors`
+- `POST /v1/monitors/{monitor_id}/run`
+- `DELETE /v1/monitors/{monitor_id}`
 - `GET /v1/providers`
 - `POST /v1/audits/email-domain`
 - `POST /v1/audits/batch`
@@ -150,9 +155,11 @@ The app now includes a simple but real SaaS account shell:
 - `GET /login` signs the account holder back into the dashboard
 - `GET /dashboard` shows current usage, audit history, billing entry points, and API key lifecycle controls
 - `POST /dashboard/audit` runs an audit against the logged-in account and consumes real plan usage
+- `POST /dashboard/monitors` adds customer domains to a persistent watchlist
+- `POST /dashboard/monitors/{monitor_id}/run` refreshes a saved monitor and writes the result into audit history
 - `GET /support`, `GET /privacy`, and `GET /terms` give the product expected commercial surfaces for early launch
 
-## Accounts, Usage, and History
+## Accounts, Usage, History, and Monitors
 
 API keys are stored hashed in SQLite. The plaintext key is only returned once during:
 
@@ -210,6 +217,28 @@ curl http://127.0.0.1:8000/v1/audit-history/AUDIT_ID \
 
 Logged-in dashboard users can also download `/dashboard/audit-history.csv` and open
 `/dashboard/audit-history/{audit_id}.json` from the history table.
+
+Use monitors to keep customer domains on an account watchlist. A monitor stores cadence, selectors,
+expected providers, and the latest score/status metadata. Running a monitor costs one audit unit and
+also creates a saved audit history row:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/monitors \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "customer-example.com",
+    "selectors": ["google"],
+    "expected_providers": ["Google Workspace"],
+    "cadence": "weekly"
+  }'
+
+curl http://127.0.0.1:8000/v1/monitors \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
+
+curl -X POST http://127.0.0.1:8000/v1/monitors/MONITOR_ID/run \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
+```
 
 ## Changelog
 
