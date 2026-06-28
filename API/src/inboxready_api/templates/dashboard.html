@@ -16,6 +16,14 @@
   </div>
 </section>
 
+<section class="section dashboard-command-strip" data-reveal>
+  <a href="#monitors">Monitors</a>
+  <a href="#history">History</a>
+  <a href="#api-keys">API Keys</a>
+  <a href="#billing">Billing</a>
+  <a href="/changelog">Changelog</a>
+</section>
+
 {% if one_time_api_key %}
 <section class="section">
   <div class="panel one-time-key" data-reveal>
@@ -61,6 +69,19 @@
           <strong>{{ usage.rate_limit_per_minute }}</strong>
           <span>audit units per minute</span>
         </article>
+      </div>
+
+      <div
+        class="usage-meter"
+        style="--usage-percent: {{ ((usage.audits_used / usage.monthly_audit_limit) * 100)|round(0) if usage.monthly_audit_limit else 0 }}%;"
+      >
+        <div>
+          <strong>Monthly usage</strong>
+          <span>{{ usage.audits_used }} of {{ usage.monthly_audit_limit }} audit units</span>
+        </div>
+        <div class="usage-track" aria-hidden="true">
+          <span></span>
+        </div>
       </div>
     </section>
 

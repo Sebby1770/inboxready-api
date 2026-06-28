@@ -2,6 +2,20 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 0.5.0 - 2026-06-28
+
+### Added
+
+- Lovable-inspired visual refresh for the landing page and dashboard.
+- Landing-page operations strip that highlights monitors, history exports, and batch reviews.
+- Dashboard command strip for fast navigation between monitors, history, API keys, billing, and changelog.
+- Monthly usage meter inside the dashboard account overview.
+
+### Improved
+
+- Reworked the color palette, typography, card radius, shadows, and buttons for a cleaner B2B SaaS feel.
+- Reduced decorative background noise and made the interface more dashboard-oriented.
+
 ## 0.4.0 - 2026-06-27
 
 ### Added

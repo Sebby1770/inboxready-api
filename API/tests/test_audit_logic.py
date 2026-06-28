@@ -133,7 +133,7 @@ def test_changelog_page_renders() -> None:
 
     assert response.status_code == 200
     assert "Track what changed" in response.text
-    assert "v0.4.0" in response.text
+    assert "v0.5.0" in response.text
     assert "Roadmap" in response.text
 
 
@@ -346,7 +346,7 @@ def test_api_root_exposes_changelog_metadata() -> None:
     payload = response.json()
     assert payload["changelog"] == "/changelog"
     assert payload["monitors"] == "/v1/monitors"
-    assert payload["latest_release"]["version"] == "0.4.0"
+    assert payload["latest_release"]["version"] == "0.5.0"
 
 
 def test_account_usage_and_history_are_metered(monkeypatch) -> None:

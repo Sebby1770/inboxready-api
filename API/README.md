@@ -23,6 +23,7 @@ InboxReady turns that into one API call.
 
 - Polished SaaS landing page at `/`
 - Interactive public audit workspace at `/app`
+- Lovable-inspired visual refresh with a cleaner operator dashboard and usage meter
 - Session-based web accounts with signup, login, and logout
 - Authenticated dashboard at `/dashboard`
 - SQLite-backed launch accounts and API keys

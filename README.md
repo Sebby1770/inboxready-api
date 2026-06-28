@@ -6,6 +6,7 @@ It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI, detects likely sendi
 
 - A production-shaped FastAPI app in [`API/`](./API)
 - A polished landing page and rate-limited public audit workspace
+- Lovable-inspired visual system for the public site and operator dashboard
 - API-key protected single-domain and batch audit endpoints
 - Canonical domain validation and concurrent batch execution
 - SQLite-backed launch accounts, usage metering, rate limits, and audit history

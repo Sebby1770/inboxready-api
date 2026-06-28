@@ -161,10 +161,31 @@ FAQS = [
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "0.5.0",
+        "date": "2026-06-28",
+        "display_date": "June 28, 2026",
+        "status": "Current release",
+        "title": "InboxReady got a sharper Lovable-inspired product interface.",
+        "summary": (
+            "This release refreshes the visual system so the product feels more like a "
+            "credible SaaS console for operators, support teams, and API buyers."
+        ),
+        "highlights": [
+            "Reworked the palette, shadows, radii, and typography for a cleaner B2B SaaS feel.",
+            "Added a landing-page operations strip for monitors, exports, and batch reviews.",
+            "Added a dashboard command strip for faster navigation between core operator workflows.",
+            "Added a monthly usage meter that makes plan consumption easier to scan.",
+        ],
+        "impact": (
+            "Best for first impressions, demos, and buyers who need the dashboard to feel "
+            "trustworthy before they wire InboxReady into customer onboarding."
+        ),
+    },
+    {
         "version": "0.4.0",
         "date": "2026-06-27",
         "display_date": "June 27, 2026",
-        "status": "Current release",
+        "status": "Domain monitors",
         "title": "InboxReady now tracks domains instead of only auditing them once.",
         "summary": (
             "This release adds account-level domain monitors so teams can keep important "
