@@ -10,13 +10,17 @@ from time import sleep
 from uuid import uuid4
 
 import pytest
+from inboxready_api.dashboard_insights import build_dashboard_insights
 from inboxready_api.main import app
 from inboxready_api.models import (
     AuditCheck,
+    AuditHistoryItem,
+    AuditHistoryResponse,
     BatchAuditResponse,
     BatchAuditRequest,
     DomainAuditRequest,
     DomainAuditResponse,
+    PlanUsageResponse,
     Recommendation,
 )
 from inboxready_api.services.batch_audit import (
@@ -27,6 +31,7 @@ from inboxready_api.services.batch_audit import (
 from inboxready_api.services.provider_detection import detect_providers
 from inboxready_api.security import verify_password
 from inboxready_api.settings import Settings
+from inboxready_api.storage import MonitorRecord
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -133,7 +138,7 @@ def test_changelog_page_renders() -> None:
 
     assert response.status_code == 200
     assert "Track what changed" in response.text
-    assert "v0.5.0" in response.text
+    assert "v0.6.0" in response.text
     assert "Roadmap" in response.text
 
 
@@ -346,7 +351,84 @@ def test_api_root_exposes_changelog_metadata() -> None:
     payload = response.json()
     assert payload["changelog"] == "/changelog"
     assert payload["monitors"] == "/v1/monitors"
-    assert payload["latest_release"]["version"] == "0.5.0"
+    assert payload["latest_release"]["version"] == "0.6.0"
+
+
+def test_dashboard_insights_prioritize_recent_risk() -> None:
+    usage = PlanUsageResponse(
+        plan="free",
+        monthly_audit_limit=100,
+        rate_limit_per_minute=15,
+        current_period_start="2026-06-01T00:00:00+00:00",
+        audits_used=82,
+        audits_remaining=18,
+    )
+    audit_history = AuditHistoryResponse(
+        usage=usage,
+        audits=[
+            AuditHistoryItem(
+                id="audit-1",
+                domain="broken.example",
+                score=42,
+                overall_status="fail",
+                units=1,
+                created_at="2026-06-29T00:00:00+00:00",
+            ),
+            AuditHistoryItem(
+                id="audit-2",
+                domain="healthy.example",
+                score=96,
+                overall_status="pass",
+                units=1,
+                created_at="2026-06-28T00:00:00+00:00",
+            ),
+        ],
+    )
+    monitors = [
+        MonitorRecord(
+            id="monitor-1",
+            account_id="account-1",
+            domain="watch.example",
+            selectors=[],
+            expected_providers=[],
+            cadence="weekly",
+            last_audit_id="audit-3",
+            last_score=70,
+            last_status="warn",
+            last_checked_at="2026-06-27T00:00:00+00:00",
+            created_at="2026-06-26T00:00:00+00:00",
+            updated_at="2026-06-27T00:00:00+00:00",
+        ),
+        MonitorRecord(
+            id="monitor-2",
+            account_id="account-1",
+            domain="pending.example",
+            selectors=[],
+            expected_providers=[],
+            cadence="manual",
+            last_audit_id=None,
+            last_score=None,
+            last_status=None,
+            last_checked_at=None,
+            created_at="2026-06-26T00:00:00+00:00",
+            updated_at="2026-06-26T00:00:00+00:00",
+        ),
+    ]
+
+    insights = build_dashboard_insights(
+        usage=usage,
+        audit_history=audit_history,
+        monitors=monitors,
+    )
+
+    attention = next(item for item in insights["summary"] if item["label"] == "Needs attention")
+    usage_headroom = next(item for item in insights["summary"] if item["label"] == "Usage headroom")
+
+    assert attention["value"] == "2"
+    assert attention["tone"] == "fail"
+    assert usage_headroom["tone"] == "warn"
+    assert insights["action_queue"][0]["title"] == "Review broken.example"
+    assert insights["focus_domains"][0]["domain"] == "broken.example"
 
 
 def test_account_usage_and_history_are_metered(monkeypatch) -> None:
@@ -492,6 +574,8 @@ def test_signup_creates_session_and_dashboard_access() -> None:
     assert dashboard.status_code == 200
     assert email in dashboard.text
     assert "Store this API key now" in dashboard.text
+    assert "Health insights" in dashboard.text
+    assert "Action queue" in dashboard.text
     assert "/dashboard/audit-history.csv" in dashboard.text
     assert "Domain monitors" in dashboard.text
 

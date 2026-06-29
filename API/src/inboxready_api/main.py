@@ -22,6 +22,7 @@ from inboxready_api.billing import (
     handle_stripe_webhook,
 )
 from inboxready_api.commerce import PLAN_LIMITS, RateLimitError, UsageLimitError, recent_window_start
+from inboxready_api.dashboard_insights import build_dashboard_insights
 from inboxready_api.models import (
     AccountCreateRequest,
     AccountOverviewResponse,
@@ -526,6 +527,9 @@ def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
         return redirect_to_login("/dashboard")
 
     store = storage()
+    audit_history = store.audit_history(account, limit=50)
+    monitors = store.list_monitors(account.id)
+    usage = audit_history.usage
     return render_page(
         request,
         name="dashboard.html",
@@ -533,9 +537,14 @@ def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
         page_description="Usage, billing, API keys, and audit history for your InboxReady account.",
         extra_context={
             "dashboard_account": account,
-            "usage": store.usage_response(account),
-            "audit_history": store.audit_history(account, limit=50),
-            "monitors": store.list_monitors(account.id),
+            "usage": usage,
+            "audit_history": audit_history,
+            "monitors": monitors,
+            "dashboard_insights": build_dashboard_insights(
+                usage=usage,
+                audit_history=audit_history,
+                monitors=monitors,
+            ),
             "api_keys": store.list_api_keys(account.id),
             "one_time_api_key": pop_one_time_api_key(request),
         },

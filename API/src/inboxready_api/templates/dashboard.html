@@ -17,6 +17,7 @@
 </section>
 
 <section class="section dashboard-command-strip" data-reveal>
+  <a href="#insights">Insights</a>
   <a href="#monitors">Monitors</a>
   <a href="#history">History</a>
   <a href="#api-keys">API Keys</a>
@@ -81,6 +82,63 @@
         </div>
         <div class="usage-track" aria-hidden="true">
           <span></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel dashboard-insights" id="insights" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Health insights</p>
+          <h2>Turn account activity into the next best action</h2>
+        </div>
+        <span class="panel-badge">{{ dashboard_insights.usage_percent }}% used</span>
+      </div>
+
+      <div class="insight-grid">
+        {% for item in dashboard_insights.summary %}
+        <article class="insight-stat insight-{{ item.tone }}">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <p>{{ item.detail }}</p>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="insight-columns">
+        <div class="action-queue">
+          <h3>Action queue</h3>
+          {% for action in dashboard_insights.action_queue %}
+          <a class="action-row action-{{ action.tone }}" href="{{ action.href }}">
+            <span>
+              <strong>{{ action.title }}</strong>
+              <small>{{ action.body }}</small>
+            </span>
+            <em>{{ action.cta }}</em>
+          </a>
+          {% endfor %}
+        </div>
+
+        <div class="domain-focus">
+          <h3>Domains to watch</h3>
+          {% if dashboard_insights.focus_domains %}
+          {% for domain in dashboard_insights.focus_domains %}
+          <div class="domain-row">
+            <span>
+              <strong>{{ domain.domain }}</strong>
+              <small>{{ domain.source }}</small>
+            </span>
+            <span class="domain-score">
+              <b>{{ domain.score }}</b>
+              <i class="status-pill status-{{ domain.tone }}">{{ domain.status }}</i>
+            </span>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="result-empty">
+            Run an audit or add a monitor to start building a domain health view.
+          </div>
+          {% endif %}
         </div>
       </div>
     </section>
@@ -186,7 +244,7 @@
       {% endif %}
     </section>
 
-    <section class="panel" data-reveal>
+    <section class="panel" id="run-audit" data-reveal>
       <div class="panel-header">
         <div>
           <p class="panel-label">Run audit</p>

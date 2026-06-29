@@ -24,6 +24,7 @@ InboxReady turns that into one API call.
 - Polished SaaS landing page at `/`
 - Interactive public audit workspace at `/app`
 - Lovable-inspired visual refresh with a cleaner operator dashboard and usage meter
+- Dashboard health insights that turn usage, monitors, and audit history into an action queue
 - Session-based web accounts with signup, login, and logout
 - Authenticated dashboard at `/dashboard`
 - SQLite-backed launch accounts and API keys
@@ -154,7 +155,7 @@ The app now includes a simple but real SaaS account shell:
 
 - `GET /signup` creates a free account, stores a hashed password, signs the user into a session, and reveals the first API key once
 - `GET /login` signs the account holder back into the dashboard
-- `GET /dashboard` shows current usage, audit history, billing entry points, and API key lifecycle controls
+- `GET /dashboard` shows current usage, health insights, audit history, billing entry points, and API key lifecycle controls
 - `POST /dashboard/audit` runs an audit against the logged-in account and consumes real plan usage
 - `POST /dashboard/monitors` adds customer domains to a persistent watchlist
 - `POST /dashboard/monitors/{monitor_id}/run` refreshes a saved monitor and writes the result into audit history

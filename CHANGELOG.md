@@ -2,6 +2,19 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 0.6.0 - 2026-06-29
+
+### Added
+
+- Dashboard health insights that combine recent audit history, monitor status, and usage headroom.
+- Action queue for failed or warning audits, unchecked monitors, and plan-capacity risk.
+- Domains-to-watch rows that surface the customer senders worth revisiting first.
+
+### Improved
+
+- Dashboard now explains operational priority instead of only showing raw account data.
+- Responsive dashboard styling now supports the new insight panel cleanly on narrow screens.
+
 ## 0.5.0 - 2026-06-28
 
 ### Added

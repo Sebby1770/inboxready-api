@@ -161,10 +161,31 @@ FAQS = [
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "0.6.0",
+        "date": "2026-06-29",
+        "display_date": "June 29, 2026",
+        "status": "Current release",
+        "title": "InboxReady now turns dashboard activity into operator priorities.",
+        "summary": (
+            "This release adds a health insight layer that summarizes recent audits, monitor "
+            "coverage, attention domains, and usage headroom inside the dashboard."
+        ),
+        "highlights": [
+            "Added dashboard health insights that combine usage, audit history, and monitor state.",
+            "Added an action queue for failed audits, unchecked monitors, and plan-capacity risk.",
+            "Added domains-to-watch rows that help operators spot the accounts worth revisiting.",
+            "Added responsive styling for the new insight panel across desktop and mobile layouts.",
+        ],
+        "impact": (
+            "Best for support and customer-success teams that need InboxReady to recommend "
+            "the next operational move, not just display raw audit results."
+        ),
+    },
+    {
         "version": "0.5.0",
         "date": "2026-06-28",
         "display_date": "June 28, 2026",
-        "status": "Current release",
+        "status": "Visual refresh",
         "title": "InboxReady got a sharper Lovable-inspired product interface.",
         "summary": (
             "This release refreshes the visual system so the product feels more like a "
