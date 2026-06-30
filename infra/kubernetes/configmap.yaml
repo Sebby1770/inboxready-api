@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inboxready-config
+  namespace: inboxready
+data:
+  INBOXREADY_HTTP_TIMEOUT_SECONDS: "5.0"
+  INBOXREADY_USER_AGENT: "InboxReady/0.7 (+https://inboxready.dev)"
+  INBOXREADY_DATABASE_PATH: "/data/inboxready.sqlite3"
+  INBOXREADY_PUBLIC_BASE_URL: "https://api.inboxready.dev"
+  INBOXREADY_SESSION_HTTPS_ONLY: "true"
+  INBOXREADY_COMPANY_NAME: "InboxReady"
+  INBOXREADY_SUPPORT_EMAIL: "support@inboxready.dev"
+  INBOXREADY_PUBLIC_SIGNUP_ENABLED: "true"
+  INBOXREADY_API_AUTH_REQUIRED: "true"
+  INBOXREADY_ALLOW_UNPAID_PLAN_PROVISIONING: "false"
+  INBOXREADY_DEMO_DAILY_LIMIT: "20"
+  INBOXREADY_DEMO_RATE_LIMIT_PER_MINUTE: "5"
+  INBOXREADY_BATCH_MAX_WORKERS: "5"

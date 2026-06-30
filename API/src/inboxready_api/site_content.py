@@ -85,6 +85,57 @@ FLOW_STEPS = [
     },
 ]
 
+OPS_CAPABILITIES = [
+    {
+        "name": "Container staging",
+        "status": "Implemented",
+        "detail": (
+            "Docker Compose runs the API behind Nginx with health checks, request IDs, "
+            "caching, rate limits, and WebSocket upgrades."
+        ),
+    },
+    {
+        "name": "CI/CD",
+        "status": "Implemented",
+        "detail": (
+            "GitHub Actions compile the package, run tests, and publish a GHCR container "
+            "image from release branches."
+        ),
+    },
+    {
+        "name": "Runtime metrics",
+        "status": "Implemented",
+        "detail": (
+            "Prometheus and JSON endpoints report request volume, QPS, throughput, "
+            "latency, availability, status codes, and recent errors."
+        ),
+    },
+    {
+        "name": "Kubernetes",
+        "status": "Ready path",
+        "detail": (
+            "Manifests cover deployment, service, ingress, probes, secrets, config, "
+            "and autoscaling once storage is externalized."
+        ),
+    },
+    {
+        "name": "Queues and object storage",
+        "status": "Deferred adapter",
+        "detail": (
+            "SQS, S3, Kafka, RabbitMQ, Lambda, and DynamoDB are documented upgrade paths "
+            "for monitor jobs, exports, retries, and high-volume history."
+        ),
+    },
+    {
+        "name": "Secure operations",
+        "status": "Implemented",
+        "detail": (
+            "CSRF, secure hashing, defensive headers, Stripe signature checks, TLS-ready "
+            "ingress, and no plain FTP by design."
+        ),
+    },
+]
+
 PRICING_TIERS = [
     {
         "name": "Starter",
@@ -161,10 +212,31 @@ FAQS = [
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "0.7.0",
+        "date": "2026-06-30",
+        "display_date": "June 30, 2026",
+        "status": "Current release",
+        "title": "InboxReady now has a real production operations layer.",
+        "summary": (
+            "This release adds deployable infrastructure assets and live runtime signals so "
+            "teams can stage, monitor, and scale the API with less guesswork."
+        ),
+        "highlights": [
+            "Added request IDs, structured access/error logs, QPS, throughput, latency, and availability metrics.",
+            "Added Prometheus-style /metrics, JSON /v1/metrics/summary, WebSocket health, and polling endpoints.",
+            "Added Docker Compose staging, Nginx proxy/cache/rate-limit config, and Kubernetes manifests.",
+            "Added GitHub Actions for CI and GHCR container publishing.",
+        ],
+        "impact": (
+            "Best for turning the MVP into something an early B2B buyer can evaluate as an "
+            "operated API product, not just a local demo."
+        ),
+    },
+    {
         "version": "0.6.0",
         "date": "2026-06-29",
         "display_date": "June 29, 2026",
-        "status": "Current release",
+        "status": "Health insights",
         "title": "InboxReady now turns dashboard activity into operator priorities.",
         "summary": (
             "This release adds a health insight layer that summarizes recent audits, monitor "

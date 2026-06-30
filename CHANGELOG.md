@@ -2,6 +2,21 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 0.7.0 - 2026-06-30
+
+### Added
+
+- Production operations pack covering Docker staging, Nginx proxying, Kubernetes manifests, CI, and container publishing.
+- Runtime observability with request IDs, structured request/error logs, Prometheus-style `/metrics`, and JSON `/v1/metrics/summary`.
+- Health streaming and polling surfaces through `/ws/health`, `/v1/health/short-poll`, and `/v1/health/long-poll`.
+- Production readiness guide mapping Kubernetes, SQS/S3, CI/CD, encryption, firewalling, WebSockets, queues, caching, load balancing, RPC, polling, and partitioning decisions.
+
+### Improved
+
+- API metadata now advertises metrics, WebSocket health, and polling endpoints.
+- Security policy now allows same-origin WebSocket health clients while keeping the defensive browser posture.
+- Repository automation now runs Python checks and publishes a GHCR image for deployment branches.
+
 ## 0.6.0 - 2026-06-29
 
 ### Added

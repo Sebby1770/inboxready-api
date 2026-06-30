@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inboxready-api
+  namespace: inboxready
+  labels:
+    app: inboxready-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inboxready-api
+  template:
+    metadata:
+      labels:
+        app: inboxready-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/sebby1770/inboxready-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: inboxready-config
+            - secretRef:
+                name: inboxready-secrets
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: inboxready-data
+              mountPath: /data
+      volumes:
+        - name: inboxready-data
+          emptyDir: {}

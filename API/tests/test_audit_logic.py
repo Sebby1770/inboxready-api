@@ -138,8 +138,16 @@ def test_changelog_page_renders() -> None:
 
     assert response.status_code == 200
     assert "Track what changed" in response.text
-    assert "v0.6.0" in response.text
+    assert "v0.7.0" in response.text
     assert "Roadmap" in response.text
+
+
+def test_ops_page_renders() -> None:
+    response = client.get("/ops")
+
+    assert response.status_code == 200
+    assert "Production readiness" in response.text
+    assert "Current runtime signals" in response.text
 
 
 def test_unique_normalized_domains_keeps_first_seen_order() -> None:
@@ -344,14 +352,64 @@ def test_readiness_checks_storage() -> None:
     assert response.json() == {"status": "ready", "storage": "ok"}
 
 
+def test_request_id_header_is_returned() -> None:
+    response = client.get("/healthz", headers={"X-Request-ID": "pytest-request-id"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "pytest-request-id"
+
+
+def test_metrics_summary_reports_runtime_counters() -> None:
+    client.get("/healthz")
+    response = client.get("/v1/metrics/summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "inboxready-api"
+    assert payload["requests_total"] >= 1
+    assert payload["qps"] >= 0
+    assert payload["availability"]["success_percentage"] >= 0
+    assert isinstance(payload["recent_errors"], list)
+
+
+def test_prometheus_metrics_endpoint_returns_text() -> None:
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "inboxready_requests_total" in response.text
+    assert "inboxready_qps" in response.text
+
+
+def test_polling_health_endpoints_return_metrics() -> None:
+    short_poll = client.get("/v1/health/short-poll")
+    long_poll = client.get("/v1/health/long-poll?timeout_seconds=1")
+
+    assert short_poll.status_code == 200
+    assert short_poll.json()["metrics"]["service"] == "inboxready-api"
+    assert long_poll.status_code == 200
+    assert long_poll.json()["waited_seconds"] == 1
+
+
+def test_websocket_health_streams_metrics() -> None:
+    with client.websocket_connect("/ws/health") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["service"] == "inboxready-api"
+    assert "requests_total" in payload
+
+
 def test_api_root_exposes_changelog_metadata() -> None:
     response = client.get("/api")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["changelog"] == "/changelog"
+    assert payload["operations"] == "/ops"
     assert payload["monitors"] == "/v1/monitors"
-    assert payload["latest_release"]["version"] == "0.6.0"
+    assert payload["metrics"] == "/metrics"
+    assert payload["websocket_health"] == "/ws/health"
+    assert payload["latest_release"]["version"] == "0.7.0"
 
 
 def test_dashboard_insights_prioritize_recent_risk() -> None:

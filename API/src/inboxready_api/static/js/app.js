@@ -501,9 +501,42 @@ async function initHealthIndicator() {
   }
 }
 
+async function initOpsMetrics() {
+  const target = document.querySelector("[data-ops-metrics]");
+  if (!target) return;
+
+  try {
+    const response = await fetch("/v1/metrics/summary");
+    if (!response.ok) throw new Error("metrics unavailable");
+    const payload = await response.json();
+    target.innerHTML = `
+      <article class="metric-card is-visible">
+        <strong>${escapeHtml(payload.requests_total)}</strong>
+        <span>requests observed</span>
+      </article>
+      <article class="metric-card is-visible">
+        <strong>${escapeHtml(payload.qps)}</strong>
+        <span>average QPS</span>
+      </article>
+      <article class="metric-card is-visible">
+        <strong>${escapeHtml(payload.availability.success_percentage)}%</strong>
+        <span>availability</span>
+      </article>
+    `;
+  } catch {
+    target.innerHTML = `
+      <div class="result-error">
+        <h3>Metrics unavailable</h3>
+        <p>The API did not return runtime metrics yet. Check /readyz and server logs.</p>
+      </div>
+    `;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-audit-form]").forEach(initAuditForm);
   document.querySelectorAll("[data-batch-form]").forEach(initBatchForm);
   initRevealAnimations();
   initHealthIndicator();
+  initOpsMetrics();
 });

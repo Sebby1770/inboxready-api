@@ -1413,6 +1413,53 @@ textarea {
   gap: 1rem;
 }
 
+.ops-live-grid,
+.ops-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.ops-live-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+}
+
+.ops-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ops-live-panel,
+.ops-command-panel,
+.ops-card,
+.ops-matrix-panel {
+  padding: 1.35rem;
+}
+
+.ops-card h3 {
+  margin: 0.85rem 0 0.55rem;
+  font-family: var(--display-font);
+  font-size: 1.35rem;
+  text-transform: uppercase;
+}
+
+.ops-card p,
+.ops-note {
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.ops-command-panel pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #111827;
+  color: #f8fafc;
+}
+
+.ops-table .history-row {
+  grid-template-columns: 0.7fr 1fr 1.25fr;
+}
+
 .release-card,
 .roadmap-card {
   padding: 1.35rem;
@@ -1588,6 +1635,8 @@ textarea {
   .auth-grid,
   .dashboard-layout,
   .release-grid,
+  .ops-live-grid,
+  .ops-grid,
   .roadmap-grid,
   .changelog-entry,
   .changelog-featured,
@@ -1651,6 +1700,7 @@ textarea {
   .report-top,
   .insight-grid,
   .history-row,
+  .ops-table .history-row,
   .monitor-card,
   .changelog-entry,
   .changelog-featured {

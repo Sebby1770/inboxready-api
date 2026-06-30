@@ -1,13 +1,33 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 from io import StringIO
+import json
+import logging
 from pathlib import Path
 import secrets
+import time
 from typing import Annotated, Any
+import uuid
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -48,6 +68,7 @@ from inboxready_api.models import (
     SupportRequestCreateRequest,
     SupportRequestResponse,
 )
+from inboxready_api.observability import metrics_snapshot, prometheus_metrics, record_request
 from inboxready_api.security import hash_password, validate_password
 from inboxready_api.site_content import (
     CHANGELOG_ENTRIES,
@@ -55,6 +76,7 @@ from inboxready_api.site_content import (
     FLOW_STEPS,
     HERO_METRICS,
     LATEST_CHANGELOG,
+    OPS_CAPABILITIES,
     PRICING_TIERS,
     ROADMAP_ITEMS,
     SAMPLE_CURL,
@@ -78,6 +100,7 @@ from inboxready_api.storage import (
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+access_logger = logging.getLogger("inboxready_api.access")
 
 CSV_FIELDNAMES = [
     "id",
@@ -110,6 +133,68 @@ app.add_middleware(
 )
 
 
+def request_route_path(request: Request) -> str:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) else request.url.path
+
+
+@app.middleware("http")
+async def observe_requests(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        duration_ms = (time.perf_counter() - started) * 1000
+        path = request_route_path(request)
+        record_request(
+            method=request.method,
+            path=path,
+            status_code=500,
+            duration_ms=duration_ms,
+            request_id=request_id,
+            error=str(exc),
+        )
+        access_logger.exception(
+            json.dumps(
+                {
+                    "event": "http_request_error",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": path,
+                    "status_code": 500,
+                    "duration_ms": round(duration_ms, 3),
+                }
+            )
+        )
+        raise
+
+    duration_ms = (time.perf_counter() - started) * 1000
+    path = request_route_path(request)
+    record_request(
+        method=request.method,
+        path=path,
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+        request_id=request_id,
+    )
+    response.headers["X-Request-ID"] = request_id
+    access_logger.info(
+        json.dumps(
+            {
+                "event": "http_request",
+                "request_id": request_id,
+                "method": request.method,
+                "path": path,
+                "status_code": response.status_code,
+                "duration_ms": round(duration_ms, 3),
+            }
+        )
+    )
+    return response
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -126,7 +211,7 @@ async def add_security_headers(request: Request, call_next):
         "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
         "script-src 'self' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "img-src 'self' data: https://fastapi.tiangolo.com; connect-src 'self'; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; connect-src 'self' ws: wss:; "
         "form-action 'self'",
     )
     if get_settings().session_https_only:
@@ -360,6 +445,7 @@ def render_page(
         "changelog_entries": CHANGELOG_ENTRIES,
         "changelog_preview": CHANGELOG_ENTRIES[:3],
         "latest_release": LATEST_CHANGELOG,
+        "ops_capabilities": OPS_CAPABILITIES,
         "roadmap_items": ROADMAP_ITEMS,
         "sample_curl": SAMPLE_CURL,
         "sample_js": SAMPLE_JS,
@@ -791,6 +877,18 @@ def changelog_page(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/ops", response_class=HTMLResponse)
+def ops_page(request: Request) -> HTMLResponse:
+    return render_page(
+        request,
+        name="ops.html",
+        page_title="Operations",
+        page_description=(
+            "Production readiness, deployment surfaces, metrics, and scaling notes for InboxReady."
+        ),
+    )
+
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request) -> HTMLResponse:
     return render_page(
@@ -849,8 +947,16 @@ def api_root() -> dict[str, object]:
         "dashboard": "/dashboard",
         "support": "/support",
         "changelog": "/changelog",
+        "operations": "/ops",
         "health": "/healthz",
         "readiness": "/readyz",
+        "metrics": "/metrics",
+        "metrics_summary": "/v1/metrics/summary",
+        "websocket_health": "/ws/health",
+        "polling": {
+            "short": "/v1/health/short-poll",
+            "long": "/v1/health/long-poll",
+        },
         "monitors": "/v1/monitors",
         "latest_release": {
             "version": LATEST_CHANGELOG["version"],
@@ -872,6 +978,43 @@ def readyz() -> dict[str, str]:
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Storage is unavailable.") from exc
     return {"status": "ready", "storage": "ok"}
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics() -> PlainTextResponse:
+    return PlainTextResponse(
+        prometheus_metrics(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
+@app.get("/v1/metrics/summary")
+def metrics_summary() -> dict[str, Any]:
+    return metrics_snapshot()
+
+
+@app.websocket("/ws/health")
+async def websocket_health(websocket: WebSocket) -> None:
+    await websocket.accept()
+    try:
+        while True:
+            await websocket.send_json(metrics_snapshot())
+            await asyncio.sleep(2)
+    except WebSocketDisconnect:
+        return
+
+
+@app.get("/v1/health/short-poll")
+def health_short_poll() -> dict[str, Any]:
+    return {"status": "ok", "metrics": metrics_snapshot()}
+
+
+@app.get("/v1/health/long-poll")
+async def health_long_poll(
+    timeout_seconds: Annotated[int, Query(ge=1, le=30)] = 1,
+) -> dict[str, Any]:
+    await asyncio.sleep(timeout_seconds)
+    return {"status": "ok", "waited_seconds": timeout_seconds, "metrics": metrics_snapshot()}
 
 
 @app.post("/v1/accounts", response_model=AccountProvisionResponse)

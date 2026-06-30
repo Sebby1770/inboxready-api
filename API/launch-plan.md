@@ -50,14 +50,14 @@ Add annual option after the first 5-10 paying customers.
 
 ## 4. Required Product Work Before Public Launch
 
-1. Add API key auth.
-2. Add per-key usage metering.
-3. Add Stripe subscriptions.
-4. Add rate limiting.
-5. Add persistent audit logging.
-6. Add error monitoring with Sentry.
-7. Add request logging and abuse protection.
-8. Add a basic status page.
+1. API key auth is implemented.
+2. Per-key usage metering is implemented.
+3. Stripe subscription hooks are implemented.
+4. App-level and proxy-level rate limiting are implemented.
+5. Persistent audit logging is implemented.
+6. Request IDs, structured logs, `/metrics`, JSON metrics, WebSocket health, and polling health endpoints are implemented.
+7. Add external alerting next: Sentry, Better Stack, Datadog, or provider-native alerts.
+8. Add a public status page once the first paying customers depend on the API.
 
 ## 5. Deploy the API
 
@@ -239,4 +239,17 @@ Run tests:
 cd /Users/sebastianforbes/Desktop/CODE/API-as-a-Service/API
 source .venv/bin/activate
 pytest
+```
+
+Stage with Docker and Nginx:
+
+```bash
+cd /Users/sebastianforbes/Desktop/CODE/API-as-a-Service
+docker compose up --build
+```
+
+Production readiness checklist:
+
+```bash
+open /Users/sebastianforbes/Desktop/CODE/API-as-a-Service/infra/production-readiness.md
 ```

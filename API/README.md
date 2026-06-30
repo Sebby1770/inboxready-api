@@ -25,6 +25,8 @@ InboxReady turns that into one API call.
 - Interactive public audit workspace at `/app`
 - Lovable-inspired visual refresh with a cleaner operator dashboard and usage meter
 - Dashboard health insights that turn usage, monitors, and audit history into an action queue
+- Runtime observability with request IDs, structured logs, QPS, throughput, latency, and availability metrics
+- Prometheus-style `/metrics`, JSON `/v1/metrics/summary`, WebSocket health, and polling health endpoints
 - Session-based web accounts with signup, login, and logout
 - Authenticated dashboard at `/dashboard`
 - SQLite-backed launch accounts and API keys
@@ -33,6 +35,7 @@ InboxReady turns that into one API call.
 - Stripe Checkout, Billing Portal, and webhook endpoints for paid plans
 - Support page plus launch-ready privacy and terms pages
 - Public changelog page and repository-level release notes
+- Docker staging, Nginx proxying, Kubernetes manifests, and CI/CD workflows at the repository root
 - Audit history CSV export plus full saved-audit JSON detail views
 - Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
 - Detects likely sending providers from DNS evidence
@@ -54,6 +57,11 @@ InboxReady turns that into one API call.
 - `GET /api`
 - `GET /healthz`
 - `GET /readyz`
+- `GET /metrics`
+- `GET /v1/metrics/summary`
+- `GET /v1/health/short-poll`
+- `GET /v1/health/long-poll`
+- `WS /ws/health`
 - `POST /demo/audit`
 - `POST /v1/accounts`
 - `GET /v1/account`
@@ -93,6 +101,7 @@ Open:
 - API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - Health check: [http://127.0.0.1:8000/healthz](http://127.0.0.1:8000/healthz)
 - Readiness check: [http://127.0.0.1:8000/readyz](http://127.0.0.1:8000/readyz)
+- Metrics: [http://127.0.0.1:8000/metrics](http://127.0.0.1:8000/metrics)
 
 ## Example Request
 
@@ -148,6 +157,33 @@ unauthenticated but rate-limited by client IP with:
 - `INBOXREADY_DEMO_DAILY_LIMIT`
 
 Use it as the public free checker. Keep `/v1/audits/*` for API-key customers.
+
+## Operations and Observability
+
+Every HTTP response includes an `X-Request-ID` header. The app records request volume, status codes,
+average latency, QPS, throughput per minute, availability percentage, and recent 5xx errors in memory.
+
+Use the JSON endpoint for internal dashboards:
+
+```bash
+curl http://127.0.0.1:8000/v1/metrics/summary
+```
+
+Use the Prometheus-style text endpoint for scraping behind a firewall or private network:
+
+```bash
+curl http://127.0.0.1:8000/metrics
+```
+
+Use WebSockets or polling when a lightweight client needs live health data without Prometheus:
+
+```bash
+curl http://127.0.0.1:8000/v1/health/short-poll
+curl "http://127.0.0.1:8000/v1/health/long-poll?timeout_seconds=5"
+```
+
+Repository-level staging and deployment assets live in `../infra`, `../docker-compose.yml`, and
+`../.github/workflows`. See `../infra/production-readiness.md` for the full operations checklist.
 
 ## Web App Layer
 
