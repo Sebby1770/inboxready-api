@@ -1253,6 +1253,187 @@ textarea {
   letter-spacing: 0.05em;
 }
 
+.playbook-panel {
+  padding: 1.35rem;
+}
+
+.playbook-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.playbook-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-family: var(--display-font);
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.playbook-summary p,
+.playbook-decision {
+  margin: 0.4rem 0 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.playbook-score {
+  min-width: 5.2rem;
+  padding: 0.8rem;
+  border-radius: var(--radius-md);
+  background: #111827;
+  color: #fffdf9;
+  text-align: center;
+}
+
+.playbook-score b {
+  display: block;
+  font-family: var(--display-font);
+  font-size: 1.7rem;
+}
+
+.playbook-score span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.playbook-decision {
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-left: 3px solid var(--teal);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 115, 119, 0.07);
+}
+
+.protocol-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.protocol-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.42rem 0.64rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.protocol-pass {
+  border-color: rgba(18, 128, 92, 0.22);
+  color: var(--success);
+  background: rgba(18, 128, 92, 0.08);
+}
+
+.protocol-warn {
+  border-color: rgba(166, 95, 0, 0.24);
+  color: var(--warning);
+  background: rgba(166, 95, 0, 0.08);
+}
+
+.protocol-fail {
+  border-color: rgba(189, 59, 59, 0.24);
+  color: var(--danger);
+  background: rgba(189, 59, 59, 0.08);
+}
+
+.protocol-info {
+  border-color: rgba(37, 99, 168, 0.2);
+  color: var(--info);
+  background: rgba(37, 99, 168, 0.07);
+}
+
+.playbook-task-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.playbook-task {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.playbook-task span {
+  display: block;
+  color: var(--accent-deep);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.playbook-task strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--display-font);
+  font-size: 0.96rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.playbook-task p {
+  margin: 0.3rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.playbook-task em {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.playbook-high {
+  border-color: rgba(189, 59, 59, 0.18);
+  background: rgba(189, 59, 59, 0.06);
+}
+
+.playbook-medium {
+  border-color: rgba(166, 95, 0, 0.18);
+  background: rgba(166, 95, 0, 0.06);
+}
+
+.playbook-low {
+  border-color: rgba(37, 99, 168, 0.16);
+  background: rgba(37, 99, 168, 0.05);
+}
+
+.playbook-mini-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.audit-playbook .playbook-decision {
+  font-size: 0.88rem;
+}
+
 .one-time-key {
   padding: 1.4rem;
 }
@@ -1276,6 +1457,12 @@ textarea {
 .history-row span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.history-row span:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
 .history-head {
@@ -1670,6 +1857,10 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .playbook-summary {
+    grid-template-columns: 1fr;
+  }
+
   .cta-panel,
   .site-header {
     flex-direction: column;
@@ -1708,13 +1899,20 @@ textarea {
   }
 
   .action-row,
-  .domain-row {
+  .domain-row,
+  .playbook-task {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .domain-score {
+  .domain-score,
+  .playbook-score {
     justify-content: flex-start;
+  }
+
+  .playbook-score {
+    width: 100%;
+    text-align: left;
   }
 
   .monitor-actions {

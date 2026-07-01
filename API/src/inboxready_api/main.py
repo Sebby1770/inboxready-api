@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+from datetime import UTC, datetime
 from io import StringIO
 import json
 import logging
@@ -12,6 +13,7 @@ from typing import Annotated, Any
 import uuid
 
 from fastapi import (
+    BackgroundTasks,
     Depends,
     FastAPI,
     Header,
@@ -22,6 +24,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
@@ -51,24 +54,35 @@ from inboxready_api.models import (
     ApiKeyListResponse,
     ApiKeyProvisionResponse,
     ApiKeyResponse,
+    AuditHistoryExportRequest,
     AuditHistoryDetailResponse,
     AuditHistoryResponse,
+    AuditJobCreateRequest,
+    AuditJobListResponse,
+    AuditJobResponse,
     BatchAuditRequest,
     BatchAuditResponse,
     BillingCheckoutRequest,
     BillingSessionResponse,
     DomainAuditRequest,
     DomainAuditResponse,
+    DueMonitorRunResponse,
+    ExportObjectListResponse,
+    ExportObjectResponse,
     MonitorCreateRequest,
     MonitorListResponse,
     MonitorResponse,
     MonitorRunResponse,
     PlanUsageResponse,
     ProviderCatalogResponse,
+    RemediationPlanResponse,
+    RpcRequest,
+    RpcResponse,
     SupportRequestCreateRequest,
     SupportRequestResponse,
 )
 from inboxready_api.observability import metrics_snapshot, prometheus_metrics, record_request
+from inboxready_api.remediation import build_remediation_plan
 from inboxready_api.security import hash_password, validate_password
 from inboxready_api.site_content import (
     CHANGELOG_ENTRIES,
@@ -385,6 +399,62 @@ def audit_history_csv_response(account: AccountRecord, *, filename: str) -> Resp
     )
 
 
+def object_store_file_path(key: str) -> Path:
+    root = Path(get_settings().object_store_path).resolve()
+    path = (root / key).resolve()
+    if root not in path.parents and path != root:
+        raise HTTPException(status_code=400, detail="Invalid export object key.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def audit_history_export_payload(
+    account: AccountRecord,
+    *,
+    request: AuditHistoryExportRequest,
+) -> tuple[bytes, str, str]:
+    rows = storage().audit_history_export_rows(account, limit=request.limit)
+    if request.format == "csv":
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=CSV_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(rows)
+        return output.getvalue().encode("utf-8"), "text/csv; charset=utf-8", "csv"
+
+    payload = {
+        "kind": "audit_history",
+        "format": "json",
+        "account_id": account.id,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "row_count": len(rows),
+        "rows": rows,
+    }
+    return (
+        json.dumps(payload, indent=2, sort_keys=True).encode("utf-8"),
+        "application/json; charset=utf-8",
+        "json",
+    )
+
+
+def create_audit_history_export_object(
+    account: AccountRecord,
+    *,
+    request: AuditHistoryExportRequest,
+) -> ExportObjectResponse:
+    body, media_type, extension = audit_history_export_payload(account, request=request)
+    key = f"{account.id}/audit-history/{secrets.token_urlsafe(16)}.{extension}"
+    object_store_file_path(key).write_bytes(body)
+    export = storage().create_export_object(
+        account_id=account.id,
+        key=key,
+        kind="audit_history",
+        format=request.format,
+        media_type=media_type,
+        size_bytes=len(body),
+    )
+    return storage().export_object_response(export)
+
+
 def split_csvish(value: str) -> list[str]:
     return [item.strip() for item in value.replace("\n", ",").split(",") if item.strip()]
 
@@ -419,6 +489,55 @@ def perform_monitor_audit(
         monitor=store.monitor_response(updated_monitor),
         audit=result,
     )
+
+
+def execute_audit_job(account_id: str, job_id: str) -> AuditJobResponse | None:
+    store = storage()
+    job = store.mark_audit_job_running(account_id=account_id, job_id=job_id)
+    if job is None:
+        return None
+    if job.status in {"succeeded", "failed"}:
+        return store.audit_job_response(job)
+    if job.status != "running":
+        return store.audit_job_response(job)
+
+    try:
+        request = DomainAuditRequest(**job.payload)
+        result = audit_domain(request, get_settings())
+        audit_id = store.log_audit(
+            account_id=job.account_id,
+            api_key_id=job.api_key_id,
+            audit=result,
+        )
+        completed = store.complete_audit_job(
+            account_id=job.account_id,
+            job_id=job.id,
+            audit=result,
+            audit_log_id=audit_id,
+        )
+        return store.audit_job_response(completed) if completed else None
+    except Exception as exc:
+        failed = store.fail_audit_job(account_id=job.account_id, job_id=job.id, error=str(exc))
+        return store.audit_job_response(failed) if failed else None
+
+
+def enqueue_audit_job(
+    *,
+    request: AuditJobCreateRequest,
+    context: AuthContext,
+    background_tasks: BackgroundTasks,
+) -> AuditJobResponse:
+    try:
+        enforce_api_usage(context, units=1)
+    except (UsageLimitError, RateLimitError) as exc:
+        raise usage_http_error(exc) from exc
+    job = storage().create_audit_job(
+        account_id=context.account.id,
+        api_key_id=context.api_key.id if context.api_key else None,
+        payload=request.model_dump(),
+    )
+    background_tasks.add_task(execute_audit_job, context.account.id, job.id)
+    return storage().audit_job_response(job)
 
 
 def render_page(
@@ -616,6 +735,11 @@ def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
     audit_history = store.audit_history(account, limit=50)
     monitors = store.list_monitors(account.id)
     usage = audit_history.usage
+    latest_playbook = None
+    if audit_history.audits:
+        latest_detail = store.audit_detail(account, audit_id=audit_history.audits[0].id)
+        if latest_detail is not None:
+            latest_playbook = build_remediation_plan(latest_detail.audit)
     return render_page(
         request,
         name="dashboard.html",
@@ -631,6 +755,7 @@ def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
                 audit_history=audit_history,
                 monitors=monitors,
             ),
+            "latest_playbook": latest_playbook,
             "api_keys": store.list_api_keys(account.id),
             "one_time_api_key": pop_one_time_api_key(request),
         },
@@ -937,6 +1062,21 @@ def dashboard_audit_history_detail(
     return detail
 
 
+@app.get("/dashboard/audit-history/{audit_id}/playbook.json", response_model=None)
+def dashboard_audit_history_playbook(
+    audit_id: str,
+    request: Request,
+) -> RemediationPlanResponse | RedirectResponse:
+    account = current_account_from_session(request)
+    if account is None:
+        return redirect_to_login("/dashboard")
+
+    detail = storage().audit_detail(account, audit_id=audit_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Audit log not found.")
+    return build_remediation_plan(detail.audit)
+
+
 @app.get("/api")
 def api_root() -> dict[str, object]:
     return {
@@ -953,11 +1093,16 @@ def api_root() -> dict[str, object]:
         "metrics": "/metrics",
         "metrics_summary": "/v1/metrics/summary",
         "websocket_health": "/ws/health",
+        "audit_jobs": "/v1/audit-jobs",
+        "exports": "/v1/exports",
+        "rpc": "/v1/rpc",
         "polling": {
             "short": "/v1/health/short-poll",
             "long": "/v1/health/long-poll",
         },
         "monitors": "/v1/monitors",
+        "due_monitors": "/v1/monitors/run-due",
+        "audit_playbook": "/v1/audit-history/{audit_id}/playbook",
         "latest_release": {
             "version": LATEST_CHANGELOG["version"],
             "date": LATEST_CHANGELOG["date"],
@@ -1097,6 +1242,39 @@ def get_audit_history_csv(
     return audit_history_csv_response(context.account, filename="inboxready-audit-history.csv")
 
 
+@app.post("/v1/exports/audit-history", response_model=ExportObjectResponse)
+def create_audit_history_export(
+    request: AuditHistoryExportRequest,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> ExportObjectResponse:
+    return create_audit_history_export_object(context.account, request=request)
+
+
+@app.get("/v1/exports", response_model=ExportObjectListResponse)
+def list_exports(
+    context: Annotated[AuthContext, Depends(require_api_context)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> ExportObjectListResponse:
+    exports = storage().list_export_objects(account_id=context.account.id, limit=limit)
+    return ExportObjectListResponse(
+        exports=[storage().export_object_response(item) for item in exports],
+    )
+
+
+@app.get("/v1/exports/{export_id}/download", response_class=FileResponse)
+def download_export(
+    export_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> FileResponse:
+    export = storage().get_export_object(account_id=context.account.id, export_id=export_id)
+    if export is None:
+        raise HTTPException(status_code=404, detail="Export object not found.")
+    path = object_store_file_path(export.key)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Export object file is missing.")
+    return FileResponse(path, media_type=export.media_type, filename=Path(export.key).name)
+
+
 @app.get("/v1/audit-history/{audit_id}", response_model=AuditHistoryDetailResponse)
 def get_audit_history_detail(
     audit_id: str,
@@ -1106,6 +1284,76 @@ def get_audit_history_detail(
     if detail is None:
         raise HTTPException(status_code=404, detail="Audit log not found.")
     return detail
+
+
+@app.get("/v1/audit-history/{audit_id}/playbook", response_model=RemediationPlanResponse)
+def get_audit_history_playbook(
+    audit_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> RemediationPlanResponse:
+    detail = storage().audit_detail(context.account, audit_id=audit_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Audit log not found.")
+    return build_remediation_plan(detail.audit)
+
+
+@app.post("/v1/audit-jobs/email-domain", response_model=AuditJobResponse)
+def create_email_domain_audit_job(
+    request: AuditJobCreateRequest,
+    background_tasks: BackgroundTasks,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> AuditJobResponse:
+    return enqueue_audit_job(request=request, context=context, background_tasks=background_tasks)
+
+
+@app.get("/v1/audit-jobs", response_model=AuditJobListResponse)
+def list_audit_jobs(
+    context: Annotated[AuthContext, Depends(require_api_context)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> AuditJobListResponse:
+    jobs = storage().list_audit_jobs(account_id=context.account.id, limit=limit)
+    return AuditJobListResponse(jobs=[storage().audit_job_response(item) for item in jobs])
+
+
+@app.get("/v1/audit-jobs/{job_id}", response_model=AuditJobResponse)
+def get_audit_job(
+    job_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> AuditJobResponse:
+    job = storage().get_audit_job(account_id=context.account.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Audit job not found.")
+    return storage().audit_job_response(job)
+
+
+@app.post("/v1/audit-jobs/{job_id}/run", response_model=AuditJobResponse)
+def run_audit_job(
+    job_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> AuditJobResponse:
+    job = storage().get_audit_job(account_id=context.account.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Audit job not found.")
+    result = execute_audit_job(context.account.id, job.id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Audit job not found.")
+    return result
+
+
+@app.get("/v1/audit-jobs/{job_id}/wait", response_model=AuditJobResponse)
+async def wait_for_audit_job(
+    job_id: str,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+    timeout_seconds: Annotated[int, Query(ge=1, le=30)] = 10,
+) -> AuditJobResponse:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        job = storage().get_audit_job(account_id=context.account.id, job_id=job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Audit job not found.")
+        if job.status in {"succeeded", "failed"} or time.monotonic() >= deadline:
+            return storage().audit_job_response(job)
+        await asyncio.sleep(0.25)
 
 
 @app.post("/v1/monitors", response_model=MonitorResponse)
@@ -1131,6 +1379,30 @@ def list_monitors(
     context: Annotated[AuthContext, Depends(require_api_context)],
 ) -> MonitorListResponse:
     return storage().monitor_list(context.account)
+
+
+@app.post("/v1/monitors/run-due", response_model=DueMonitorRunResponse)
+def run_due_monitors(
+    context: Annotated[AuthContext, Depends(require_api_context)],
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> DueMonitorRunResponse:
+    store = storage()
+    monitors = store.list_due_monitors(account_id=context.account.id, limit=limit)
+    if not monitors:
+        return DueMonitorRunResponse(monitors_checked=0, audits=[])
+    try:
+        enforce_api_usage(context, units=len(monitors))
+    except (UsageLimitError, RateLimitError) as exc:
+        raise usage_http_error(exc) from exc
+    results = [
+        perform_monitor_audit(
+            account=context.account,
+            monitor=monitor,
+            api_key_id=context.api_key.id if context.api_key else None,
+        )
+        for monitor in monitors
+    ]
+    return DueMonitorRunResponse(monitors_checked=len(results), audits=results)
 
 
 @app.post("/v1/monitors/{monitor_id}/run", response_model=MonitorRunResponse)
@@ -1224,6 +1496,68 @@ def support_api(request: SupportRequestCreateRequest) -> SupportRequestResponse:
         message=request.message,
     )
     return SupportRequestResponse(status="received", email=request.email, subject=request.subject)
+
+
+@app.post("/v1/rpc", response_model=RpcResponse)
+def rpc(
+    request: RpcRequest,
+    background_tasks: BackgroundTasks,
+    context: Annotated[AuthContext, Depends(require_api_context)],
+) -> RpcResponse:
+    try:
+        if request.method == "inboxready.health":
+            return RpcResponse(ok=True, id=request.id, result={"status": "ok"})
+        if request.method == "inboxready.metrics":
+            return RpcResponse(ok=True, id=request.id, result=metrics_snapshot())
+        if request.method == "inboxready.providers":
+            return RpcResponse(
+                ok=True,
+                id=request.id,
+                result=ProviderCatalogResponse(providers=get_provider_catalog()).model_dump(
+                    mode="json"
+                ),
+            )
+        if request.method == "inboxready.audit.create":
+            audit_request = DomainAuditRequest(**request.params)
+            try:
+                enforce_api_usage(context, units=1)
+            except (UsageLimitError, RateLimitError) as exc:
+                raise usage_http_error(exc) from exc
+            result = audit_domain(audit_request, get_settings())
+            audit_id = storage().log_audit(
+                account_id=context.account.id,
+                api_key_id=context.api_key.id if context.api_key else None,
+                audit=result,
+            )
+            return RpcResponse(
+                ok=True,
+                id=request.id,
+                result={"audit_log_id": audit_id, "audit": result.model_dump(mode="json")},
+            )
+        if request.method == "inboxready.audit.enqueue":
+            job = enqueue_audit_job(
+                request=AuditJobCreateRequest(**request.params),
+                context=context,
+                background_tasks=background_tasks,
+            )
+            return RpcResponse(ok=True, id=request.id, result={"job": job.model_dump(mode="json")})
+    except HTTPException as exc:
+        return RpcResponse(
+            ok=False,
+            id=request.id,
+            error={"code": str(exc.status_code), "message": str(exc.detail)},
+        )
+    except Exception as exc:
+        return RpcResponse(
+            ok=False,
+            id=request.id,
+            error={"code": "bad_request", "message": str(exc)},
+        )
+    return RpcResponse(
+        ok=False,
+        id=request.id,
+        error={"code": "method_not_found", "message": f"Unsupported RPC method {request.method}."},
+    )
 
 
 @app.post("/v1/billing/checkout", response_model=BillingSessionResponse)

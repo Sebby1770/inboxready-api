@@ -120,10 +120,18 @@ OPS_CAPABILITIES = [
     },
     {
         "name": "Queues and object storage",
-        "status": "Deferred adapter",
+        "status": "Implemented",
         "detail": (
-            "SQS, S3, Kafka, RabbitMQ, Lambda, and DynamoDB are documented upgrade paths "
-            "for monitor jobs, exports, retries, and high-volume history."
+            "Audit jobs now run through a persisted queue abstraction, and audit-history "
+            "exports are archived into a local S3-style object store."
+        ),
+    },
+    {
+        "name": "RPC and worker hooks",
+        "status": "Implemented",
+        "detail": (
+            "RPC commands, long-poll job waits, manual job execution, and due-monitor runs "
+            "create a clean path to Lambda, SQS, RabbitMQ, or Kafka later."
         ),
     },
     {
@@ -204,18 +212,60 @@ FAQS = [
         "question": "What would you build next after this MVP?",
         "answer": (
             "API keys, usage metering, stored audit history, and Stripe billing hooks are now "
-            "in the launch layer. Scheduled re-checks, webhook alerts, and branded remediation "
-            "guides are the next retention features."
+            "in the launch layer. Queue-backed audits, due-monitor runs, and remediation "
+            "playbooks are now available; webhook alerts are the next retention feature."
         ),
     },
 ]
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "0.9.0",
+        "date": "2026-07-01",
+        "display_date": "July 1, 2026",
+        "status": "Current release",
+        "title": "InboxReady now has queue, archive, worker, and RPC surfaces.",
+        "summary": (
+            "This release turns more of the infrastructure checklist into usable product "
+            "capabilities: async audit jobs, archived exports, scheduled monitor hooks, and RPC."
+        ),
+        "highlights": [
+            "Added queue-backed audit jobs with create, list, get, run, and long-poll wait endpoints.",
+            "Added S3-style audit-history export objects with JSON/CSV archive creation, listing, and download.",
+            "Added due-monitor execution for cron or Lambda-style scheduled checks.",
+            "Added /v1/rpc for health, metrics, providers, synchronous audits, and queued audits.",
+        ],
+        "impact": (
+            "Best for customers that want InboxReady to fit worker queues, serverless jobs, "
+            "internal RPC clients, and archive workflows without forcing a cloud migration yet."
+        ),
+    },
+    {
+        "version": "0.8.0",
+        "date": "2026-06-30",
+        "display_date": "June 30, 2026",
+        "status": "Remediation playbooks",
+        "title": "InboxReady now turns saved audits into customer-ready playbooks.",
+        "summary": (
+            "This release adds launch decisions, protocol coverage, and owner-ready remediation "
+            "tasks so teams can move from raw DNS findings to clear customer action plans."
+        ),
+        "highlights": [
+            "Added remediation playbook models and saved-audit playbook endpoints for API and dashboard users.",
+            "Added dashboard customer playbooks with launch decisions, protocol coverage, score cards, and task owners.",
+            "Added live audit playbook guidance so demos immediately show what to do next.",
+            "Added playbook links beside saved audit history rows for faster support handoff.",
+        ],
+        "impact": (
+            "Best for customer support, success, and onboarding teams that need audit output "
+            "to become a clear customer-facing checklist."
+        ),
+    },
+    {
         "version": "0.7.0",
         "date": "2026-06-30",
         "display_date": "June 30, 2026",
-        "status": "Current release",
+        "status": "Operations layer",
         "title": "InboxReady now has a real production operations layer.",
         "summary": (
             "This release adds deployable infrastructure assets and live runtime signals so "

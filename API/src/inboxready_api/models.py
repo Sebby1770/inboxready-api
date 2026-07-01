@@ -10,6 +10,8 @@ from inboxready_api.domain_validation import normalize_domain
 Status = Literal["pass", "warn", "fail", "info"]
 Severity = Literal["low", "medium", "high"]
 PlanName = Literal["free", "starter", "growth", "pro"]
+AuditJobStatus = Literal["queued", "running", "succeeded", "failed"]
+ExportFormat = Literal["json", "csv"]
 
 
 class ProviderMatch(BaseModel):
@@ -155,6 +157,70 @@ class MonitorRunResponse(BaseModel):
     audit: DomainAuditResponse
 
 
+class DueMonitorRunResponse(BaseModel):
+    monitors_checked: int
+    audits: list[MonitorRunResponse] = Field(default_factory=list)
+
+
+class AuditJobCreateRequest(DomainAuditRequest):
+    pass
+
+
+class AuditJobResponse(BaseModel):
+    id: str
+    status: AuditJobStatus
+    kind: Literal["email_domain"]
+    audit_log_id: str | None = None
+    audit: DomainAuditResponse | None = None
+    error: str | None = None
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
+class AuditJobListResponse(BaseModel):
+    jobs: list[AuditJobResponse] = Field(default_factory=list)
+
+
+class AuditHistoryExportRequest(BaseModel):
+    format: ExportFormat = Field(default="json")
+    limit: int = Field(default=500, ge=1, le=1000)
+
+
+class ExportObjectResponse(BaseModel):
+    id: str
+    key: str
+    kind: Literal["audit_history"]
+    format: ExportFormat
+    media_type: str
+    size_bytes: int
+    download_url: str
+    created_at: str
+
+
+class ExportObjectListResponse(BaseModel):
+    exports: list[ExportObjectResponse] = Field(default_factory=list)
+
+
+class RpcRequest(BaseModel):
+    method: Literal[
+        "inboxready.health",
+        "inboxready.metrics",
+        "inboxready.providers",
+        "inboxready.audit.create",
+        "inboxready.audit.enqueue",
+    ]
+    params: dict[str, Any] = Field(default_factory=dict)
+    id: str | int | None = None
+
+
+class RpcResponse(BaseModel):
+    ok: bool
+    id: str | int | None = None
+    result: dict[str, Any] | list[Any] | None = None
+    error: dict[str, Any] | None = None
+
+
 class ProviderCatalogResponse(BaseModel):
     providers: list[ProviderMatch]
 
@@ -236,6 +302,37 @@ class AuditHistoryDetailResponse(BaseModel):
     units: int
     created_at: str
     audit: DomainAuditResponse
+
+
+class ProtocolReadiness(BaseModel):
+    key: str
+    name: str
+    status: Status
+    summary: str
+
+
+class RemediationTask(BaseModel):
+    severity: Severity
+    code: str
+    title: str
+    description: str
+    owner: str
+    effort: str
+    customer_message: str
+    details: str | None = None
+
+
+class RemediationPlanResponse(BaseModel):
+    domain: str
+    score: int = Field(ge=0, le=100)
+    overall_status: Status
+    readiness_stage: Literal["ready", "review", "blocked"]
+    launch_decision: str
+    executive_summary: str
+    generated_at: str
+    protocol_coverage: list[ProtocolReadiness] = Field(default_factory=list)
+    tasks: list[RemediationTask] = Field(default_factory=list)
+    references: list[HttpUrl] = Field(default_factory=list)
 
 
 class BillingCheckoutRequest(BaseModel):

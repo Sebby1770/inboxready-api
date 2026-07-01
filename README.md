@@ -8,11 +8,13 @@ It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI, detects likely sendi
 - A polished landing page and rate-limited public audit workspace
 - Lovable-inspired visual system for the public site and operator dashboard
 - Dashboard health insights with an action queue and domains-to-watch summary
+- Saved-audit remediation playbooks with launch decisions, protocol coverage, and task owners
+- Async audit jobs, object-style exports, due-monitor runs, and RPC-style commands for heavier integrations
 - Runtime observability with request IDs, QPS, throughput, availability, `/metrics`, WebSocket health, and polling endpoints
 - API-key protected single-domain and batch audit endpoints
 - Canonical domain validation and concurrent batch execution
 - SQLite-backed launch accounts, usage metering, rate limits, and audit history
-- Audit history CSV exports and full saved-audit JSON detail views
+- Audit history CSV exports, full saved-audit JSON detail views, and customer-ready playbook reports
 - Account-level domain monitors with run-now checks and last-known status
 - API-key listing and revocation for credential hygiene
 - Stripe Checkout, Billing Portal, and webhook routes for paid plans
@@ -59,4 +61,4 @@ pytest
 
 Use [`infra/production-readiness.md`](./infra/production-readiness.md) for the implementation matrix
 and launch steps covering Docker, Kubernetes, CI/CD, metrics, rate limiting, caching, cloud deployment,
-and storage-scaling decisions.
+queue/object adapters, RPC, and storage-scaling decisions.

@@ -6,6 +6,7 @@ services:
       - ./API/.env.example
     environment:
       INBOXREADY_DATABASE_PATH: /data/inboxready.sqlite3
+      INBOXREADY_OBJECT_STORE_PATH: /data/object-store
       INBOXREADY_PUBLIC_BASE_URL: http://127.0.0.1:8080
       INBOXREADY_SESSION_SECRET: staging-local-change-before-production
     volumes:

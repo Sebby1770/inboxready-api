@@ -40,6 +40,102 @@ function getScoreColor(score) {
   return "#b23b33";
 }
 
+const PROTOCOL_LABELS = {
+  mx: "MX routing",
+  spf: "SPF authorization",
+  dmarc: "DMARC policy",
+  dkim: "DKIM signatures",
+  bimi: "BIMI branding",
+  mta_sts: "MTA-STS transport",
+  tls_rpt: "TLS-RPT reporting",
+};
+
+const TASK_OWNER_BY_CODE = {
+  "mx-missing": "DNS administrator",
+  "spf-missing": "DNS administrator",
+  "spf-too-many-lookups": "DNS administrator",
+  "dmarc-missing": "DNS administrator",
+  "dmarc-monitoring-only": "Deliverability owner",
+  "dkim-missing": "Product onboarding",
+  "provider-mismatch": "Product onboarding",
+  "bimi-missing": "Brand or marketing",
+  "mta-sts-missing": "Security engineering",
+  "tls-rpt-missing": "Security engineering",
+};
+
+const TASK_EFFORT_BY_SEVERITY = {
+  high: "Same day",
+  medium: "30-60 min",
+  low: "15-30 min",
+};
+
+function getReadinessStage(audit) {
+  if (
+    audit.overall_status === "fail" ||
+    audit.recommendations.some((item) => item.severity === "high")
+  ) {
+    return "blocked";
+  }
+  if (audit.overall_status === "warn" || audit.score < 85) {
+    return "review";
+  }
+  return "ready";
+}
+
+function getLaunchDecision(stage) {
+  if (stage === "blocked") {
+    return "Do not launch customer sending from this domain until the high-priority DNS items are fixed.";
+  }
+  if (stage === "review") {
+    return "Launch cautiously only after reviewing the warning items and confirming the expected sender setup.";
+  }
+  return "This domain is ready for customer sending based on the current authentication posture.";
+}
+
+function renderAuditPlaybook(audit) {
+  const stage = getReadinessStage(audit);
+  const protocolPills = Object.entries(audit.checks)
+    .map(
+      ([key, check]) =>
+        `<span class="protocol-pill protocol-${escapeHtml(check.status)}">${escapeHtml(
+          PROTOCOL_LABELS[key] || key.replaceAll("_", " ").toUpperCase(),
+        )}</span>`,
+    )
+    .join("");
+
+  const tasks = audit.recommendations.length
+    ? audit.recommendations
+        .slice(0, 4)
+        .map((item) => {
+          const owner = TASK_OWNER_BY_CODE[item.code] || "DNS or deliverability owner";
+          const effort = TASK_EFFORT_BY_SEVERITY[item.severity] || "30-60 min";
+          return `
+            <article class="playbook-task playbook-${escapeHtml(item.severity)}">
+              <div>
+                <span>${escapeHtml(owner)} · ${escapeHtml(effort)}</span>
+                <strong>${escapeHtml(item.message)}</strong>
+                ${item.details ? `<p>${escapeHtml(item.details)}</p>` : ""}
+              </div>
+              <em>${escapeHtml(item.severity)}</em>
+            </article>
+          `;
+        })
+        .join("")
+    : '<div class="result-empty">No launch-blocking tasks were generated from this audit.</div>';
+
+  return `
+    <div class="provider-list audit-playbook">
+      <div class="playbook-mini-header">
+        <h4>Launch playbook</h4>
+        <span class="panel-badge">${escapeHtml(stage)}</span>
+      </div>
+      <p class="playbook-decision">${escapeHtml(getLaunchDecision(stage))}</p>
+      <div class="protocol-strip">${protocolPills}</div>
+      <div class="playbook-task-list">${tasks}</div>
+    </div>
+  `;
+}
+
 function recentDomains() {
   try {
     return JSON.parse(localStorage.getItem(RECENT_DOMAINS_KEY) || "[]");
@@ -170,6 +266,8 @@ function renderAudit(target, audit) {
         .join("")}</ul>`
     : "<p>No references returned.</p>";
 
+  const playbook = renderAuditPlaybook(audit);
+
   target.innerHTML = `
     <div class="audit-report">
       <div class="report-top">
@@ -196,6 +294,8 @@ function renderAudit(target, audit) {
             <h4>Detected providers</h4>
             <div class="recent-domains">${providers}</div>
           </div>
+
+          ${playbook}
 
           <div class="recommendations">
             <h4>Recommended next actions</h4>

@@ -56,8 +56,9 @@ Add annual option after the first 5-10 paying customers.
 4. App-level and proxy-level rate limiting are implemented.
 5. Persistent audit logging is implemented.
 6. Request IDs, structured logs, `/metrics`, JSON metrics, WebSocket health, and polling health endpoints are implemented.
-7. Add external alerting next: Sentry, Better Stack, Datadog, or provider-native alerts.
-8. Add a public status page once the first paying customers depend on the API.
+7. Queue-backed audit jobs, due-monitor worker hooks, export archives, and RPC commands are implemented.
+8. Add external alerting next: Sentry, Better Stack, Datadog, or provider-native alerts.
+9. Add a public status page once the first paying customers depend on the API.
 
 ## 5. Deploy the API
 

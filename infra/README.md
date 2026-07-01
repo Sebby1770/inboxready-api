@@ -17,6 +17,7 @@ Open:
 - API docs: http://127.0.0.1:8080/docs
 - Health: http://127.0.0.1:8080/healthz
 - Metrics: http://127.0.0.1:8080/metrics
+- Operations: http://127.0.0.1:8080/ops
 
 ## Kubernetes
 
@@ -32,9 +33,10 @@ kubectl apply -f infra/kubernetes/ingress.yaml
 kubectl apply -f infra/kubernetes/hpa.yaml
 ```
 
-The launch app uses embedded SQLite. Keep one writer replica until storage is externalized to
-Postgres, DynamoDB, or another managed database. The service, ingress, probes, and HPA are included
-so the deployment path is ready once the storage layer is moved out of the container.
+The launch app uses embedded SQLite plus a local object-store directory for export archives. Keep
+one writer replica until storage is externalized to Postgres/DynamoDB and object archives move to S3
+or equivalent durable storage. The service, ingress, probes, and HPA are included so the deployment
+path is ready once the storage layer is moved out of the container.
 
 ## CI/CD
 

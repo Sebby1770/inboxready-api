@@ -18,6 +18,7 @@
 
 <section class="section dashboard-command-strip" data-reveal>
   <a href="#insights">Insights</a>
+  <a href="#playbook">Playbook</a>
   <a href="#monitors">Monitors</a>
   <a href="#history">History</a>
   <a href="#api-keys">API Keys</a>
@@ -141,6 +142,74 @@
           {% endif %}
         </div>
       </div>
+    </section>
+
+    <section class="panel playbook-panel" id="playbook" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Customer playbook</p>
+          <h2>Translate saved audits into launch decisions</h2>
+        </div>
+        {% if latest_playbook %}
+        <span class="panel-badge">{{ latest_playbook.readiness_stage|upper }}</span>
+        {% else %}
+        <span class="panel-badge">Waiting</span>
+        {% endif %}
+      </div>
+
+      {% if latest_playbook %}
+      <div class="playbook-summary">
+        <div>
+          <strong>{{ latest_playbook.domain }}</strong>
+          <p>{{ latest_playbook.executive_summary }}</p>
+        </div>
+        <div class="playbook-score">
+          <b>{{ latest_playbook.score }}</b>
+          <span>{{ latest_playbook.overall_status }}</span>
+        </div>
+      </div>
+
+      <p class="playbook-decision">{{ latest_playbook.launch_decision }}</p>
+
+      <div class="protocol-strip">
+        {% for protocol in latest_playbook.protocol_coverage %}
+        <span class="protocol-pill protocol-{{ protocol.status }}">
+          {{ protocol.name }}
+        </span>
+        {% endfor %}
+      </div>
+
+      <div class="playbook-task-list">
+        {% if latest_playbook.tasks %}
+          {% for task in latest_playbook.tasks[:4] %}
+          <article class="playbook-task playbook-{{ task.severity }}">
+            <div>
+              <span>{{ task.owner }} · {{ task.effort }}</span>
+              <strong>{{ task.title }}</strong>
+              <p>{{ task.customer_message }}</p>
+            </div>
+            <em>{{ task.severity }}</em>
+          </article>
+          {% endfor %}
+        {% else %}
+          <div class="result-empty">
+            No launch-blocking tasks were generated from the latest saved audit.
+          </div>
+        {% endif %}
+      </div>
+
+      <a
+        class="button button-secondary full-width"
+        href="/dashboard/audit-history/{{ audit_history.audits[0].id }}/playbook.json"
+      >
+        Open Playbook JSON
+      </a>
+      {% else %}
+      <div class="result-empty">
+        Run and save an audit to generate a launch decision, protocol coverage,
+        and owner-ready remediation tasks.
+      </div>
+      {% endif %}
     </section>
 
     <section class="panel" id="monitors" data-reveal>
@@ -355,7 +424,7 @@
           <span>Score</span>
           <span>Status</span>
           <span>When</span>
-          <span>Export</span>
+          <span>Reports</span>
         </div>
         {% for audit in audit_history.audits %}
         <div class="history-row">
@@ -373,6 +442,12 @@
               href="/dashboard/audit-history/{{ audit.id }}.json"
             >
               JSON
+            </a>
+            <a
+              class="button button-secondary button-small"
+              href="/dashboard/audit-history/{{ audit.id }}/playbook.json"
+            >
+              Playbook
             </a>
           </span>
         </div>

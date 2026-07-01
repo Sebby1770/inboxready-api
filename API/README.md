@@ -25,6 +25,8 @@ InboxReady turns that into one API call.
 - Interactive public audit workspace at `/app`
 - Lovable-inspired visual refresh with a cleaner operator dashboard and usage meter
 - Dashboard health insights that turn usage, monitors, and audit history into an action queue
+- Saved-audit remediation playbooks with launch decisions, protocol coverage, and owner-ready tasks
+- Async audit jobs, object-style exports, due-monitor runs, and RPC-style commands for heavier integrations
 - Runtime observability with request IDs, structured logs, QPS, throughput, latency, and availability metrics
 - Prometheus-style `/metrics`, JSON `/v1/metrics/summary`, WebSocket health, and polling health endpoints
 - Session-based web accounts with signup, login, and logout
@@ -36,7 +38,7 @@ InboxReady turns that into one API call.
 - Support page plus launch-ready privacy and terms pages
 - Public changelog page and repository-level release notes
 - Docker staging, Nginx proxying, Kubernetes manifests, and CI/CD workflows at the repository root
-- Audit history CSV export plus full saved-audit JSON detail views
+- Audit history CSV export plus full saved-audit JSON detail views and playbook reports
 - Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
 - Detects likely sending providers from DNS evidence
 - Scores domain readiness from 0-100
@@ -72,11 +74,22 @@ InboxReady turns that into one API call.
 - `GET /v1/audit-history`
 - `GET /v1/audit-history.csv`
 - `GET /v1/audit-history/{audit_id}`
+- `GET /v1/audit-history/{audit_id}/playbook`
+- `POST /v1/exports/audit-history`
+- `GET /v1/exports`
+- `GET /v1/exports/{export_id}/download`
+- `POST /v1/audit-jobs/email-domain`
+- `GET /v1/audit-jobs`
+- `GET /v1/audit-jobs/{job_id}`
+- `POST /v1/audit-jobs/{job_id}/run`
+- `GET /v1/audit-jobs/{job_id}/wait`
 - `POST /v1/monitors`
 - `GET /v1/monitors`
+- `POST /v1/monitors/run-due`
 - `POST /v1/monitors/{monitor_id}/run`
 - `DELETE /v1/monitors/{monitor_id}`
 - `GET /v1/providers`
+- `POST /v1/rpc`
 - `POST /v1/audits/email-domain`
 - `POST /v1/audits/batch`
 - `POST /v1/billing/checkout`
@@ -185,13 +198,53 @@ curl "http://127.0.0.1:8000/v1/health/long-poll?timeout_seconds=5"
 Repository-level staging and deployment assets live in `../infra`, `../docker-compose.yml`, and
 `../.github/workflows`. See `../infra/production-readiness.md` for the full operations checklist.
 
+## Queue, Archive, Worker, and RPC Surfaces
+
+Queue a domain audit when a product workflow should return quickly and poll later:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/audit-jobs/email-domain \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"example.com","selectors":["google"]}'
+
+curl http://127.0.0.1:8000/v1/audit-jobs/JOB_ID/wait \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
+```
+
+Create local export objects for audit history. This is the MVP-friendly version of an S3 archive;
+move `INBOXREADY_OBJECT_STORE_PATH` to S3 or another object store when usage grows:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/exports/audit-history \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"format":"json","limit":500}'
+```
+
+Run due monitors from cron, GitHub Actions, Lambda, or another scheduler:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/monitors/run-due?limit=10" \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
+```
+
+Use `POST /v1/rpc` when an internal client wants a command-style integration:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/rpc \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"cmd-1","method":"inboxready.audit.enqueue","params":{"domain":"example.com"}}'
+```
+
 ## Web App Layer
 
 The app now includes a simple but real SaaS account shell:
 
 - `GET /signup` creates a free account, stores a hashed password, signs the user into a session, and reveals the first API key once
 - `GET /login` signs the account holder back into the dashboard
-- `GET /dashboard` shows current usage, health insights, audit history, billing entry points, and API key lifecycle controls
+- `GET /dashboard` shows current usage, health insights, customer playbooks, audit history, billing entry points, and API key lifecycle controls
 - `POST /dashboard/audit` runs an audit against the logged-in account and consumes real plan usage
 - `POST /dashboard/monitors` adds customer domains to a persistent watchlist
 - `POST /dashboard/monitors/{monitor_id}/run` refreshes a saved monitor and writes the result into audit history
@@ -243,7 +296,7 @@ curl http://127.0.0.1:8000/v1/audit-history \
   -H "Authorization: Bearer $INBOXREADY_API_KEY"
 ```
 
-Export saved history as CSV or open a full saved audit by ID:
+Export saved history as CSV, open a full saved audit by ID, or generate a customer-ready playbook:
 
 ```bash
 curl http://127.0.0.1:8000/v1/audit-history.csv \
@@ -251,10 +304,14 @@ curl http://127.0.0.1:8000/v1/audit-history.csv \
 
 curl http://127.0.0.1:8000/v1/audit-history/AUDIT_ID \
   -H "Authorization: Bearer $INBOXREADY_API_KEY"
+
+curl http://127.0.0.1:8000/v1/audit-history/AUDIT_ID/playbook \
+  -H "Authorization: Bearer $INBOXREADY_API_KEY"
 ```
 
 Logged-in dashboard users can also download `/dashboard/audit-history.csv` and open
-`/dashboard/audit-history/{audit_id}.json` from the history table.
+`/dashboard/audit-history/{audit_id}.json` or
+`/dashboard/audit-history/{audit_id}/playbook.json` from the history table.
 
 Use monitors to keep customer domains on an account watchlist. A monitor stores cadence, selectors,
 expected providers, and the latest score/status metadata. Running a monitor costs one audit unit and

@@ -8,8 +8,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     http_timeout_seconds: float = 5.0
-    user_agent: str = "InboxReady/0.1 (+https://example.com)"
+    user_agent: str = "InboxReady/0.9 (+https://example.com)"
     database_path: str = "var/inboxready.sqlite3"
+    object_store_path: str = "var/object-store"
     public_base_url: str = "http://127.0.0.1:8000"
     session_secret: str = Field(
         default="dev-only-inboxready-session-secret-change-me",

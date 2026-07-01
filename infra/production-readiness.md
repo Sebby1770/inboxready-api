@@ -9,8 +9,8 @@ justify them.
 | --- | --- |
 | Kubernetes | Added `infra/kubernetes` namespace, config, secret example, deployment, service, ingress, and HPA manifests. Keep one writer replica while SQLite is embedded. |
 | Docker staging | Added root `docker-compose.yml` that builds `API/Dockerfile`, persists local SQLite data, and runs Nginx in front of the API. |
-| SQS | Deferred adapter. Use SQS for scheduled monitor jobs and webhook retries once background automation ships. Not needed for synchronous audit MVP. |
-| S3 | Deferred adapter. Use S3 for long-term audit export archives and customer report attachments after CSV/JSON exports have demand. |
+| SQS | Implemented queue abstraction via persisted audit jobs and due-monitor runner. Use SQS as the external adapter when workers need to scale outside the API process. |
+| S3 | Implemented local object-store archive for JSON/CSV audit-history exports. Use S3 for signed URLs and durable customer report delivery later. |
 | Cherry pick | Use normal Git flow: `git cherry-pick COMMIT_SHA` for backporting fixes between `main`, staging, and release branches. |
 | Containerisation | Existing `API/Dockerfile` plus new `.dockerignore`, Compose staging, and GHCR publishing workflow. |
 | CI/CD | Added `.github/workflows/ci.yml` and `.github/workflows/container.yml` for tests, compile checks, and container publishing. |
@@ -19,11 +19,11 @@ justify them.
 | Firewall | Nginx rate limiting and private-network-only `/metrics` proxy rules are included. Add cloud WAF/IP allowlisting at the provider edge. |
 | FTP | Intentionally not enabled. Plain FTP is unsafe for customer data; use HTTPS exports, S3, or SFTP if a customer contract requires file delivery. |
 | WebSockets | Added `/ws/health` to stream live service metrics to internal dashboards or operators. |
-| Tensor/ML serving | Not needed for the deterministic DNS scoring MVP. If scoring becomes ML-based, serve it as a separate RPC/Lambda worker. |
-| Kafka/RabbitMQ | Deferred. Use Kafka/RabbitMQ only if monitor events, webhook retries, or customer notifications outgrow SQS/simple queues. |
+| Tensor/ML serving | Not needed for the deterministic DNS scoring MVP. If scoring becomes ML-based, serve it behind the existing RPC/job boundary. |
+| Kafka/RabbitMQ | Persisted audit jobs create the queue boundary now. Use Kafka/RabbitMQ only if monitor events, webhook retries, or notifications outgrow the local queue/SQS path. |
 | Database optimisation | Existing storage uses bounded queries, normalized domains, account-level indexing patterns, and one-unit metering. Next step is Postgres indexes before horizontal writes. |
-| Serverless/Lambda | Deferred deployment option. Lambda fits scheduled monitor execution or webhook fan-out; the API itself stays simpler as a container first. |
-| DynamoDB | Deferred storage option for high-volume audit history or monitor state. Current SQLite is intentionally small-launch friendly. |
+| Serverless/Lambda | Due-monitor execution and manual job-run endpoints can be called by cron or Lambda. The API itself stays simpler as a container first. |
+| DynamoDB | Deferred storage option for high-volume audit jobs, audit history, export metadata, or monitor state. Current SQLite is intentionally small-launch friendly. |
 | Deployments | Added Render config, Docker Compose staging, Kubernetes manifests, and GHCR image publishing. |
 | Embedded database | SQLite remains the launch database for minimal ops. Do not run multi-writer replicas until moving to managed storage. |
 | Rate limiting | Existing app-level usage limits plus Nginx public request limits. |
@@ -33,7 +33,7 @@ justify them.
 | Caching proxy | Nginx caches static assets, docs, and OpenAPI responses for short windows. |
 | Availability | Readiness/liveness probes, success-rate metrics, and health endpoints are included. |
 | Throughput | Added `throughput_per_minute` in JSON metrics and Prometheus output. |
-| RPC | The public surface remains REST/OpenAPI. Internal RPC can be added later for workers without changing customer endpoints. |
+| RPC | Added `POST /v1/rpc` for health, metrics, providers, synchronous audits, and queued audits. |
 | Long/short polling | Added `/v1/health/short-poll` and `/v1/health/long-poll`. |
 | Sharding/partitioning | Documented future path: partition audit history by account/month or move high-volume history to DynamoDB/S3. |
 | Git/GitHub | Repo uses a Codex feature branch, GitHub Actions, GHCR, and PR-based release flow. |
@@ -48,6 +48,6 @@ justify them.
 5. Run smoke checks: `/healthz`, `/readyz`, `/metrics`, `/docs`, `/app`, signup, dashboard, and one paid-plan checkout test.
 6. Configure Stripe webhooks for `/v1/billing/webhook`.
 7. Add uptime monitoring against `/readyz` and private metrics scraping against `/metrics`.
-8. Keep SQLite for design partners; move to Postgres or DynamoDB before multi-region or multi-replica writes.
+8. Keep SQLite and the local object store for design partners; move to Postgres plus S3 or DynamoDB before multi-region or multi-replica writes.
 9. Start outbound with the public checker and API docs as the demo path.
 10. Ship scheduled monitor workers only after design partners confirm they want drift alerts.

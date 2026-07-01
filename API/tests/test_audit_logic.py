@@ -23,6 +23,7 @@ from inboxready_api.models import (
     PlanUsageResponse,
     Recommendation,
 )
+from inboxready_api.remediation import build_remediation_plan
 from inboxready_api.services.batch_audit import (
     audit_domains,
     summarize_batch,
@@ -138,7 +139,7 @@ def test_changelog_page_renders() -> None:
 
     assert response.status_code == 200
     assert "Track what changed" in response.text
-    assert "v0.7.0" in response.text
+    assert "v0.9.0" in response.text
     assert "Roadmap" in response.text
 
 
@@ -409,7 +410,51 @@ def test_api_root_exposes_changelog_metadata() -> None:
     assert payload["monitors"] == "/v1/monitors"
     assert payload["metrics"] == "/metrics"
     assert payload["websocket_health"] == "/ws/health"
-    assert payload["latest_release"]["version"] == "0.7.0"
+    assert payload["audit_jobs"] == "/v1/audit-jobs"
+    assert payload["exports"] == "/v1/exports"
+    assert payload["rpc"] == "/v1/rpc"
+    assert payload["due_monitors"] == "/v1/monitors/run-due"
+    assert payload["audit_playbook"] == "/v1/audit-history/{audit_id}/playbook"
+    assert payload["latest_release"]["version"] == "0.9.0"
+
+
+def test_remediation_plan_builds_customer_ready_tasks() -> None:
+    audit = DomainAuditResponse(
+        domain="customer.example",
+        score=38,
+        overall_status="fail",
+        checked_at="2026-06-30T00:00:00+00:00",
+        providers=[],
+        checks={
+            "dmarc": AuditCheck(
+                status="fail",
+                summary="No DMARC record was found.",
+                details={},
+            ),
+            "spf": AuditCheck(
+                status="pass",
+                summary="SPF is present.",
+                details={},
+            ),
+        },
+        recommendations=[
+            Recommendation(
+                severity="high",
+                code="dmarc-missing",
+                message="Publish a DMARC record, even if you start with p=none.",
+                details="Create _dmarc.customer.example as a TXT record.",
+            )
+        ],
+        references=[],
+    )
+
+    plan = build_remediation_plan(audit)
+
+    assert plan.readiness_stage == "blocked"
+    assert "Do not launch" in plan.launch_decision
+    assert plan.protocol_coverage[0].name == "DMARC policy"
+    assert plan.tasks[0].owner == "DNS administrator"
+    assert plan.tasks[0].effort == "Same day"
 
 
 def test_dashboard_insights_prioritize_recent_risk() -> None:
@@ -523,11 +568,80 @@ def test_account_usage_and_history_are_metered(monkeypatch) -> None:
     assert detail.json()["audit"]["domain"] == "example.com"
     assert detail.json()["units"] == 1
 
+    playbook = client.get(f"/v1/audit-history/{audit_id}/playbook", headers=headers)
+    assert playbook.status_code == 200
+    assert playbook.json()["domain"] == "example.com"
+    assert playbook.json()["readiness_stage"] == "ready"
+
+    export = client.post(
+        "/v1/exports/audit-history",
+        headers=headers,
+        json={"format": "json", "limit": 10},
+    )
+    assert export.status_code == 200
+    export_payload = export.json()
+    assert export_payload["kind"] == "audit_history"
+    assert export_payload["format"] == "json"
+
+    listed_exports = client.get("/v1/exports", headers=headers)
+    assert listed_exports.status_code == 200
+    assert listed_exports.json()["exports"][0]["id"] == export_payload["id"]
+
+    downloaded_export = client.get(export_payload["download_url"], headers=headers)
+    assert downloaded_export.status_code == 200
+    assert "example.com" in downloaded_export.text
+
     csv_export = client.get("/v1/audit-history.csv", headers=headers)
     assert csv_export.status_code == 200
     assert "text/csv" in csv_export.headers["content-type"]
     assert "domain,score,overall_status" in csv_export.text
     assert "example.com" in csv_export.text
+
+
+def test_audit_jobs_and_rpc_paths(monkeypatch) -> None:
+    def fake_audit_domain(request, settings):
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=94,
+            overall_status="pass",
+            checked_at="2026-06-30T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domain", fake_audit_domain)
+    api_key = provision_api_key()
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    created = client.post(
+        "/v1/audit-jobs/email-domain",
+        headers=headers,
+        json={"domain": "queued.example"},
+    )
+    assert created.status_code == 200
+    job_id = created.json()["id"]
+
+    waited = client.get(f"/v1/audit-jobs/{job_id}/wait?timeout_seconds=1", headers=headers)
+    assert waited.status_code == 200
+    if waited.json()["status"] != "succeeded":
+        waited = client.post(f"/v1/audit-jobs/{job_id}/run", headers=headers)
+    assert waited.json()["status"] == "succeeded"
+    assert waited.json()["audit"]["domain"] == "queued.example"
+
+    listed = client.get("/v1/audit-jobs", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["jobs"][0]["id"] == job_id
+
+    rpc_health = client.post(
+        "/v1/rpc",
+        headers=headers,
+        json={"method": "inboxready.health", "params": {}, "id": "health-1"},
+    )
+    assert rpc_health.status_code == 200
+    assert rpc_health.json()["ok"] is True
+    assert rpc_health.json()["result"]["status"] == "ok"
 
 
 def test_monitors_can_be_created_run_and_deleted(monkeypatch) -> None:
@@ -566,6 +680,11 @@ def test_monitors_can_be_created_run_and_deleted(monkeypatch) -> None:
     listed = client.get("/v1/monitors", headers=headers)
     assert listed.status_code == 200
     assert listed.json()["monitors"][0]["id"] == monitor["id"]
+
+    due = client.post("/v1/monitors/run-due?limit=5", headers=headers)
+    assert due.status_code == 200
+    assert due.json()["monitors_checked"] == 1
+    assert due.json()["audits"][0]["audit"]["score"] == 83
 
     run = client.post(f"/v1/monitors/{monitor['id']}/run", headers=headers)
     assert run.status_code == 200
@@ -634,6 +753,7 @@ def test_signup_creates_session_and_dashboard_access() -> None:
     assert "Store this API key now" in dashboard.text
     assert "Health insights" in dashboard.text
     assert "Action queue" in dashboard.text
+    assert "Customer playbook" in dashboard.text
     assert "/dashboard/audit-history.csv" in dashboard.text
     assert "Domain monitors" in dashboard.text
 

@@ -13,12 +13,16 @@ from inboxready_api.commerce import PLAN_LIMITS, current_period_start, normalize
 from inboxready_api.models import (
     AccountOverviewResponse,
     AccountResponse,
+    AuditJobResponse,
+    AuditJobStatus,
     ApiKeyListResponse,
     ApiKeyResponse,
     AuditHistoryDetailResponse,
     AuditHistoryItem,
     AuditHistoryResponse,
     DomainAuditResponse,
+    ExportFormat,
+    ExportObjectResponse,
     MonitorCadence,
     MonitorListResponse,
     MonitorResponse,
@@ -81,6 +85,34 @@ class MonitorRecord:
     last_checked_at: str | None
     created_at: str
     updated_at: str
+
+
+@dataclass(frozen=True)
+class AuditJobRecord:
+    id: str
+    account_id: str
+    api_key_id: str | None
+    kind: str
+    status: AuditJobStatus
+    payload: dict[str, object]
+    result_audit_log_id: str | None
+    result: DomainAuditResponse | None
+    error: str | None
+    created_at: str
+    started_at: str | None
+    finished_at: str | None
+
+
+@dataclass(frozen=True)
+class ExportObjectRecord:
+    id: str
+    account_id: str
+    key: str
+    kind: str
+    format: ExportFormat
+    media_type: str
+    size_bytes: int
+    created_at: str
 
 
 @dataclass(frozen=True)
@@ -185,12 +217,44 @@ class Storage:
                   UNIQUE(account_id, domain)
                 );
 
+                CREATE TABLE IF NOT EXISTS audit_jobs (
+                  id TEXT PRIMARY KEY,
+                  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                  api_key_id TEXT REFERENCES api_keys(id) ON DELETE SET NULL,
+                  kind TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'queued',
+                  payload_json TEXT NOT NULL,
+                  result_audit_log_id TEXT REFERENCES audit_logs(id) ON DELETE SET NULL,
+                  result_json TEXT,
+                  error TEXT,
+                  created_at TEXT NOT NULL,
+                  started_at TEXT,
+                  finished_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS export_objects (
+                  id TEXT PRIMARY KEY,
+                  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                  object_key TEXT NOT NULL UNIQUE,
+                  kind TEXT NOT NULL,
+                  format TEXT NOT NULL,
+                  media_type TEXT NOT NULL,
+                  size_bytes INTEGER NOT NULL,
+                  created_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS audit_logs_account_created_idx
                   ON audit_logs(account_id, created_at);
                 CREATE INDEX IF NOT EXISTS rate_events_identifier_created_idx
                   ON rate_events(identifier, created_at);
                 CREATE INDEX IF NOT EXISTS domain_monitors_account_updated_idx
                   ON domain_monitors(account_id, updated_at);
+                CREATE INDEX IF NOT EXISTS audit_jobs_account_created_idx
+                  ON audit_jobs(account_id, created_at);
+                CREATE INDEX IF NOT EXISTS audit_jobs_account_status_idx
+                  ON audit_jobs(account_id, status, created_at);
+                CREATE INDEX IF NOT EXISTS export_objects_account_created_idx
+                  ON export_objects(account_id, created_at);
                 """
             )
             self._ensure_column(conn, "accounts", "password_hash", "TEXT")
@@ -518,6 +582,179 @@ class Storage:
             audit=decode_audit_response(row["response_json"]),
         )
 
+    def create_audit_job(
+        self,
+        *,
+        account_id: str,
+        api_key_id: str | None,
+        payload: dict[str, object],
+        kind: str = "email_domain",
+    ) -> AuditJobRecord:
+        self.init_schema()
+        job_id = str(uuid.uuid4())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO audit_jobs (
+                  id, account_id, api_key_id, kind, status, payload_json, created_at
+                )
+                VALUES (?, ?, ?, ?, 'queued', ?, ?)
+                """,
+                (job_id, account_id, api_key_id, kind, json.dumps(payload), utc_now()),
+            )
+        job = self.get_audit_job(account_id=account_id, job_id=job_id)
+        if job is None:
+            raise RuntimeError("Audit job creation failed.")
+        return job
+
+    def list_audit_jobs(self, *, account_id: str, limit: int = 25) -> list[AuditJobRecord]:
+        self.init_schema()
+        capped_limit = max(1, min(limit, 100))
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM audit_jobs
+                WHERE account_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (account_id, capped_limit),
+            ).fetchall()
+        return [self._audit_job_from_row(row) for row in rows]
+
+    def get_audit_job(self, *, account_id: str, job_id: str) -> AuditJobRecord | None:
+        self.init_schema()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM audit_jobs
+                WHERE account_id = ? AND id = ?
+                """,
+                (account_id, job_id),
+            ).fetchone()
+        return self._audit_job_from_row(row) if row else None
+
+    def mark_audit_job_running(self, *, account_id: str, job_id: str) -> AuditJobRecord | None:
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE audit_jobs
+                SET status = 'running', started_at = COALESCE(started_at, ?)
+                WHERE account_id = ? AND id = ? AND status = 'queued'
+                """,
+                (now, account_id, job_id),
+            )
+        return self.get_audit_job(account_id=account_id, job_id=job_id)
+
+    def complete_audit_job(
+        self,
+        *,
+        account_id: str,
+        job_id: str,
+        audit: DomainAuditResponse,
+        audit_log_id: str,
+    ) -> AuditJobRecord | None:
+        self.init_schema()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE audit_jobs
+                SET status = 'succeeded',
+                    result_audit_log_id = ?,
+                    result_json = ?,
+                    error = NULL,
+                    finished_at = ?
+                WHERE account_id = ? AND id = ?
+                """,
+                (audit_log_id, audit.model_dump_json(), utc_now(), account_id, job_id),
+            )
+        return self.get_audit_job(account_id=account_id, job_id=job_id)
+
+    def fail_audit_job(
+        self,
+        *,
+        account_id: str,
+        job_id: str,
+        error: str,
+    ) -> AuditJobRecord | None:
+        self.init_schema()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE audit_jobs
+                SET status = 'failed', error = ?, finished_at = ?
+                WHERE account_id = ? AND id = ?
+                """,
+                (error, utc_now(), account_id, job_id),
+            )
+        return self.get_audit_job(account_id=account_id, job_id=job_id)
+
+    def create_export_object(
+        self,
+        *,
+        account_id: str,
+        key: str,
+        kind: str,
+        format: ExportFormat,
+        media_type: str,
+        size_bytes: int,
+    ) -> ExportObjectRecord:
+        self.init_schema()
+        export_id = str(uuid.uuid4())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO export_objects (
+                  id, account_id, object_key, kind, format, media_type, size_bytes, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (export_id, account_id, key, kind, format, media_type, size_bytes, utc_now()),
+            )
+        export = self.get_export_object(account_id=account_id, export_id=export_id)
+        if export is None:
+            raise RuntimeError("Export object creation failed.")
+        return export
+
+    def list_export_objects(
+        self,
+        *,
+        account_id: str,
+        limit: int = 25,
+    ) -> list[ExportObjectRecord]:
+        self.init_schema()
+        capped_limit = max(1, min(limit, 100))
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM export_objects
+                WHERE account_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (account_id, capped_limit),
+            ).fetchall()
+        return [self._export_object_from_row(row) for row in rows]
+
+    def get_export_object(
+        self,
+        *,
+        account_id: str,
+        export_id: str,
+    ) -> ExportObjectRecord | None:
+        self.init_schema()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM export_objects
+                WHERE account_id = ? AND id = ?
+                """,
+                (account_id, export_id),
+            ).fetchone()
+        return self._export_object_from_row(row) if row else None
+
     def audit_history_export_rows(
         self,
         account: AccountRecord,
@@ -610,6 +847,27 @@ class Storage:
                 ORDER BY updated_at DESC
                 """,
                 (account_id,),
+            ).fetchall()
+        return [self._monitor_from_row(row) for row in rows]
+
+    def list_due_monitors(self, *, account_id: str, limit: int = 10) -> list[MonitorRecord]:
+        self.init_schema()
+        capped_limit = max(1, min(limit, 50))
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM domain_monitors
+                WHERE account_id = ?
+                  AND cadence != 'manual'
+                  AND (
+                    last_checked_at IS NULL
+                    OR (cadence = 'weekly' AND last_checked_at <= datetime('now', '-7 days'))
+                    OR (cadence = 'monthly' AND last_checked_at <= datetime('now', '-30 days'))
+                  )
+                ORDER BY COALESCE(last_checked_at, created_at) ASC
+                LIMIT ?
+                """,
+                (account_id, capped_limit),
             ).fetchall()
         return [self._monitor_from_row(row) for row in rows]
 
@@ -747,6 +1005,31 @@ class Storage:
             updated_at=monitor.updated_at,
         )
 
+    def audit_job_response(self, job: AuditJobRecord) -> AuditJobResponse:
+        return AuditJobResponse(
+            id=job.id,
+            status=job.status,
+            kind="email_domain",
+            audit_log_id=job.result_audit_log_id,
+            audit=job.result,
+            error=job.error,
+            created_at=job.created_at,
+            started_at=job.started_at,
+            finished_at=job.finished_at,
+        )
+
+    def export_object_response(self, export: ExportObjectRecord) -> ExportObjectResponse:
+        return ExportObjectResponse(
+            id=export.id,
+            key=export.key,
+            kind="audit_history",
+            format=export.format,
+            media_type=export.media_type,
+            size_bytes=export.size_bytes,
+            download_url=f"/v1/exports/{export.id}/download",
+            created_at=export.created_at,
+        )
+
     def _account_from_row(self, row: sqlite3.Row) -> AccountRecord:
         return AccountRecord(
             id=row["id"],
@@ -787,6 +1070,35 @@ class Storage:
             updated_at=row["updated_at"],
         )
 
+    def _audit_job_from_row(self, row: sqlite3.Row) -> AuditJobRecord:
+        result_json = row["result_json"]
+        return AuditJobRecord(
+            id=row["id"],
+            account_id=row["account_id"],
+            api_key_id=row["api_key_id"],
+            kind=row["kind"],
+            status=_normalize_audit_job_status(row["status"]),
+            payload=json.loads(row["payload_json"]),
+            result_audit_log_id=row["result_audit_log_id"],
+            result=decode_audit_response(result_json) if result_json else None,
+            error=row["error"],
+            created_at=row["created_at"],
+            started_at=row["started_at"],
+            finished_at=row["finished_at"],
+        )
+
+    def _export_object_from_row(self, row: sqlite3.Row) -> ExportObjectRecord:
+        return ExportObjectRecord(
+            id=row["id"],
+            account_id=row["account_id"],
+            key=row["object_key"],
+            kind=row["kind"],
+            format=_normalize_export_format(row["format"]),
+            media_type=row["media_type"],
+            size_bytes=row["size_bytes"],
+            created_at=row["created_at"],
+        )
+
     def _ensure_column(
         self,
         conn: sqlite3.Connection,
@@ -824,3 +1136,15 @@ def _normalize_status(value: str) -> Status:
     if value in {"pass", "warn", "fail", "info"}:
         return value
     return "info"
+
+
+def _normalize_audit_job_status(value: str) -> AuditJobStatus:
+    if value in {"queued", "running", "succeeded", "failed"}:
+        return value
+    return "failed"
+
+
+def _normalize_export_format(value: str) -> ExportFormat:
+    if value in {"json", "csv"}:
+        return value
+    return "json"

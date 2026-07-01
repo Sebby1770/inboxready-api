@@ -2,6 +2,36 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 0.9.0 - 2026-07-01
+
+### Added
+
+- Queue-backed audit jobs with create, list, get, manual-run, and long-poll wait endpoints.
+- S3-style audit-history export objects with JSON/CSV archive creation, listing, and authenticated downloads.
+- Due-monitor runner for cron, worker, or Lambda-style scheduled monitor execution.
+- RPC command endpoint at `POST /v1/rpc` for health, metrics, providers, synchronous audits, and queued audits.
+
+### Improved
+
+- API metadata now advertises audit jobs, exports, RPC, and due-monitor execution.
+- Operations page now distinguishes implemented queue/object/RPC primitives from future cloud adapters.
+- Staging and Kubernetes configs now include the object-store path for persistent export archives.
+
+## 0.8.0 - 2026-06-30
+
+### Added
+
+- Remediation playbook models that turn saved audits into launch decisions, protocol coverage, and owner-ready tasks.
+- Authenticated API endpoint for saved-audit playbooks at `GET /v1/audit-history/{audit_id}/playbook`.
+- Dashboard playbook JSON endpoint at `GET /dashboard/audit-history/{audit_id}/playbook.json`.
+- Customer playbook panel in the dashboard with protocol coverage, score summary, launch decision, and task owners.
+- Live audit playbook guidance inside browser audit results.
+
+### Improved
+
+- Audit history rows now link directly to both raw JSON and playbook reports.
+- Dashboard output now helps support teams communicate the next customer action instead of only listing technical findings.
+
 ## 0.7.0 - 2026-06-30
 
 ### Added
