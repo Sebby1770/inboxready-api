@@ -98,6 +98,18 @@ Steps:
 4. Set secrets with `fly secrets set`.
 5. Deploy with `fly deploy`.
 
+### Option C: Vercel
+
+Best if you want preview URLs for every PR and a low-ops launch lane.
+
+Steps:
+
+1. Link the repo with `vercel link`.
+2. Set `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` in GitHub Actions.
+3. Set the required `INBOXREADY_*` environment variables in Vercel.
+4. Use the `API/index.py`, `vercel.json`, and `requirements.txt` deployment path.
+5. Move SQLite and local export archives to managed storage before paid production usage.
+
 ## 6. Add Billing
 
 Use Stripe:

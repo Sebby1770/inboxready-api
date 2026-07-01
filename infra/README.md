@@ -2,6 +2,12 @@
 
 This folder contains the launch operations layer for InboxReady API.
 
+## Vercel
+
+Use [vercel-deployment.md](./vercel-deployment.md) for the Vercel Python Function deployment lane.
+That path is best for preview URLs, demos, and low-ops launch deployments before moving state to
+managed storage.
+
 ## Local Staging
 
 Run the API behind an Nginx proxy with rate limiting, static/OpenAPI caching, WebSocket upgrade

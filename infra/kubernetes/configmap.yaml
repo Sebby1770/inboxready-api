@@ -5,7 +5,7 @@ metadata:
   namespace: inboxready
 data:
   INBOXREADY_HTTP_TIMEOUT_SECONDS: "5.0"
-  INBOXREADY_USER_AGENT: "InboxReady/0.9 (+https://inboxready.dev)"
+  INBOXREADY_USER_AGENT: "InboxReady/1.0 (+https://inboxready.dev)"
   INBOXREADY_DATABASE_PATH: "/data/inboxready.sqlite3"
   INBOXREADY_OBJECT_STORE_PATH: "/data/object-store"
   INBOXREADY_PUBLIC_BASE_URL: "https://api.inboxready.dev"

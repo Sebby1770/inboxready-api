@@ -23,6 +23,7 @@ It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI, detects likely sendi
 - Tests for parsing, provider detection, batch summarization, and web routes
 - Render deployment configuration in [`render.yaml`](./render.yaml)
 - Docker Compose staging, Nginx proxy config, Kubernetes manifests, and CI/CD workflows in [`infra/`](./infra)
+- Vercel Python Function deployment config in [`API/index.py`](./API/index.py), [`vercel.json`](./vercel.json), and [`infra/vercel-deployment.md`](./infra/vercel-deployment.md)
 
 ## Run Locally
 
@@ -50,6 +51,20 @@ docker compose up --build
 Open the proxied staging site at [http://127.0.0.1:8080](http://127.0.0.1:8080).
 The proxy includes rate limiting, short-lived docs/static caching, WebSocket upgrades, and request ID forwarding.
 
+## Deploy With Vercel
+
+InboxReady can also run as a Vercel Python Function for preview URLs and a low-ops launch lane:
+
+```bash
+npm install -g vercel
+vercel link
+vercel dev
+vercel deploy
+```
+
+See [`infra/vercel-deployment.md`](./infra/vercel-deployment.md) for required Vercel/GitHub secrets,
+environment variables, and the managed-storage caveat for production.
+
 ## Test
 
 ```bash
@@ -61,4 +76,4 @@ pytest
 
 Use [`infra/production-readiness.md`](./infra/production-readiness.md) for the implementation matrix
 and launch steps covering Docker, Kubernetes, CI/CD, metrics, rate limiting, caching, cloud deployment,
-queue/object adapters, RPC, and storage-scaling decisions.
+Vercel, queue/object adapters, RPC, and storage-scaling decisions.

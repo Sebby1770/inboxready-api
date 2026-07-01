@@ -139,7 +139,7 @@ def test_changelog_page_renders() -> None:
 
     assert response.status_code == 200
     assert "Track what changed" in response.text
-    assert "v0.9.0" in response.text
+    assert "v1.0.0" in response.text
     assert "Roadmap" in response.text
 
 
@@ -415,7 +415,7 @@ def test_api_root_exposes_changelog_metadata() -> None:
     assert payload["rpc"] == "/v1/rpc"
     assert payload["due_monitors"] == "/v1/monitors/run-due"
     assert payload["audit_playbook"] == "/v1/audit-history/{audit_id}/playbook"
-    assert payload["latest_release"]["version"] == "0.9.0"
+    assert payload["latest_release"]["version"] == "1.0.0"
 
 
 def test_remediation_plan_builds_customer_ready_tasks() -> None:

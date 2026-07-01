@@ -14,7 +14,7 @@ justify them.
 | Cherry pick | Use normal Git flow: `git cherry-pick COMMIT_SHA` for backporting fixes between `main`, staging, and release branches. |
 | Containerisation | Existing `API/Dockerfile` plus new `.dockerignore`, Compose staging, and GHCR publishing workflow. |
 | CI/CD | Added `.github/workflows/ci.yml` and `.github/workflows/container.yml` for tests, compile checks, and container publishing. |
-| Cloud | Render config already exists; Kubernetes and GHCR assets now support a cloud migration path. |
+| Cloud | Render config exists; Vercel Python Function config now supports preview/production deploys; Kubernetes and GHCR assets support a container migration path. |
 | Encryption | App has secure password hashing, CSRF, defensive headers, webhook signature verification, optional secure cookies/HSTS, and TLS-ready ingress. |
 | Firewall | Nginx rate limiting and private-network-only `/metrics` proxy rules are included. Add cloud WAF/IP allowlisting at the provider edge. |
 | FTP | Intentionally not enabled. Plain FTP is unsafe for customer data; use HTTPS exports, S3, or SFTP if a customer contract requires file delivery. |
@@ -24,7 +24,7 @@ justify them.
 | Database optimisation | Existing storage uses bounded queries, normalized domains, account-level indexing patterns, and one-unit metering. Next step is Postgres indexes before horizontal writes. |
 | Serverless/Lambda | Due-monitor execution and manual job-run endpoints can be called by cron or Lambda. The API itself stays simpler as a container first. |
 | DynamoDB | Deferred storage option for high-volume audit jobs, audit history, export metadata, or monitor state. Current SQLite is intentionally small-launch friendly. |
-| Deployments | Added Render config, Docker Compose staging, Kubernetes manifests, and GHCR image publishing. |
+| Deployments | Added Render config, Vercel config/workflows, Docker Compose staging, Kubernetes manifests, and GHCR image publishing. |
 | Embedded database | SQLite remains the launch database for minimal ops. Do not run multi-writer replicas until moving to managed storage. |
 | Rate limiting | Existing app-level usage limits plus Nginx public request limits. |
 | Error logging | Added structured request/error logs with request IDs and recent error capture in `/v1/metrics/summary`. |

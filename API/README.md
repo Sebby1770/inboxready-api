@@ -38,6 +38,7 @@ InboxReady turns that into one API call.
 - Support page plus launch-ready privacy and terms pages
 - Public changelog page and repository-level release notes
 - Docker staging, Nginx proxying, Kubernetes manifests, and CI/CD workflows at the repository root
+- Vercel Python Function adapter, routing config, and deployment workflows at the repository root
 - Audit history CSV export plus full saved-audit JSON detail views and playbook reports
 - Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
 - Detects likely sending providers from DNS evidence
@@ -196,7 +197,9 @@ curl "http://127.0.0.1:8000/v1/health/long-poll?timeout_seconds=5"
 ```
 
 Repository-level staging and deployment assets live in `../infra`, `../docker-compose.yml`, and
-`../.github/workflows`. See `../infra/production-readiness.md` for the full operations checklist.
+`../.github/workflows`. Vercel deployment assets live in `../API/index.py`, `../vercel.json`,
+`../requirements.txt`, and `../infra/vercel-deployment.md`. See `../infra/production-readiness.md`
+for the full operations checklist.
 
 ## Queue, Archive, Worker, and RPC Surfaces
 

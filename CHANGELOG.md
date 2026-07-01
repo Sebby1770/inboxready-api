@@ -2,6 +2,20 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 1.0.0 - 2026-07-01
+
+### Added
+
+- Vercel deployment lane with `API/index.py`, `vercel.json`, `.vercelignore`, and root `requirements.txt`.
+- GitHub Actions workflows for Vercel preview deployments on pull requests and production deployments from `main`.
+- Vercel deployment guide covering required secrets, environment variables, local commands, and production storage caveats.
+
+### Improved
+
+- Repository launch paths now cover Render, Docker/Kubernetes, and Vercel.
+- Vercel function defaults use `/tmp` for preview-safe SQLite and export archives while documenting the managed-storage upgrade path.
+- Product metadata now identifies the Vercel-ready release as version `1.0.0`.
+
 ## 0.9.0 - 2026-07-01
 
 ### Added

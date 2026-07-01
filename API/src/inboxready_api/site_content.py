@@ -95,6 +95,14 @@ OPS_CAPABILITIES = [
         ),
     },
     {
+        "name": "Vercel previews",
+        "status": "Implemented",
+        "detail": (
+            "A Vercel Python Function adapter, routing config, dependency manifest, and "
+            "GitHub workflows support preview and production deployments."
+        ),
+    },
+    {
         "name": "CI/CD",
         "status": "Implemented",
         "detail": (
@@ -220,10 +228,31 @@ FAQS = [
 
 CHANGELOG_ENTRIES = [
     {
-        "version": "0.9.0",
+        "version": "1.0.0",
         "date": "2026-07-01",
         "display_date": "July 1, 2026",
         "status": "Current release",
+        "title": "InboxReady is now Vercel-ready for preview and production deploys.",
+        "summary": (
+            "This release adds a Vercel deployment lane so the FastAPI product can ship "
+            "preview URLs, production deploys, and GitHub-based release workflows."
+        ),
+        "highlights": [
+            "Added a Vercel Python Function adapter at API/index.py.",
+            "Added vercel.json routing, function duration config, deployment headers, and .vercelignore.",
+            "Added root requirements.txt so Vercel can install the Python runtime dependencies.",
+            "Added GitHub Actions workflows for Vercel preview and production deployments.",
+        ],
+        "impact": (
+            "Best for demos, investor/customer previews, and a low-ops launch lane before "
+            "the app needs durable managed storage behind the Vercel runtime."
+        ),
+    },
+    {
+        "version": "0.9.0",
+        "date": "2026-07-01",
+        "display_date": "July 1, 2026",
+        "status": "Queue and RPC",
         "title": "InboxReady now has queue, archive, worker, and RPC surfaces.",
         "summary": (
             "This release turns more of the infrastructure checklist into usable product "
