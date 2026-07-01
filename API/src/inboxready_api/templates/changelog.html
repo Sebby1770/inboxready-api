@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section workspace-hero">
+  <div class="section-heading compact" data-reveal>
+    <p class="section-kicker">Changelog</p>
+    <h1>Track what changed across the InboxReady product surface.</h1>
+    <p>
+      Release notes for the API, dashboard, billing hooks, and launch workflow,
+      plus a clear view of what we would build next.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <article class="panel changelog-entry changelog-featured" data-reveal>
+    <div class="changelog-meta">
+      <span class="panel-badge">{{ latest_release.status }}</span>
+      <time datetime="{{ latest_release.date }}">{{ latest_release.display_date }}</time>
+      <strong class="release-version">v{{ latest_release.version }}</strong>
+    </div>
+    <div>
+      <h2>{{ latest_release.title }}</h2>
+      <p class="release-summary">{{ latest_release.summary }}</p>
+      <ul class="card-points">
+        {% for item in latest_release.highlights %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      <p class="release-impact">{{ latest_release.impact }}</p>
+    </div>
+  </article>
+</section>
+
+<section class="section changelog-layout">
+  {% for entry in changelog_entries[1:] %}
+  <article class="panel changelog-entry" data-reveal>
+    <div class="changelog-meta">
+      <span class="panel-badge">{{ entry.status }}</span>
+      <time datetime="{{ entry.date }}">{{ entry.display_date }}</time>
+      <strong class="release-version">v{{ entry.version }}</strong>
+    </div>
+    <div>
+      <h2>{{ entry.title }}</h2>
+      <p class="release-summary">{{ entry.summary }}</p>
+      <ul class="card-points">
+        {% for item in entry.highlights %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      <p class="release-impact">{{ entry.impact }}</p>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="section release-section">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Roadmap</p>
+    <h2>The next retention features are operational, not ornamental.</h2>
+    <p>
+      The most valuable follow-up work deepens how often teams depend on the
+      audit response inside onboarding and support.
+    </p>
+  </div>
+
+  <div class="roadmap-grid">
+    {% for item in roadmap_items %}
+    <article class="panel roadmap-card" data-reveal>
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.body }}</p>
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="release-actions" data-reveal>
+    <a class="button" href="/app">Open Workspace</a>
+    <a
+      class="button button-secondary"
+      href="{% if current_account %}/dashboard{% else %}/signup{% endif %}"
+      >{% if current_account %}Open Dashboard{% else %}Create Account{% endif
+      %}</a
+    >
+  </div>
+</section>
+{% endblock %}

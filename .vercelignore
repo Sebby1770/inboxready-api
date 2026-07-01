@@ -1,0 +1,12 @@
+.git
+.github
+.pytest_cache
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+API/.venv
+API/var
+API/src/inboxready_api.egg-info
+infra
+var

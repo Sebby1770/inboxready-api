@@ -4,14 +4,62 @@ from inboxready_api.services.dns_audit import (
     parse_semicolon_tags,
     parse_spf_record,
 )
-from inboxready_api.models import AuditCheck, BatchAuditRequest, DomainAuditResponse, Recommendation
+import re
+from threading import Lock
+from time import sleep
+from uuid import uuid4
+
+import pytest
+from inboxready_api.dashboard_insights import build_dashboard_insights
 from inboxready_api.main import app
-from inboxready_api.services.batch_audit import summarize_batch, unique_normalized_domains
+from inboxready_api.models import (
+    AuditCheck,
+    AuditHistoryItem,
+    AuditHistoryResponse,
+    BatchAuditResponse,
+    BatchAuditRequest,
+    DomainAuditRequest,
+    DomainAuditResponse,
+    PlanUsageResponse,
+    Recommendation,
+)
+from inboxready_api.remediation import build_remediation_plan
+from inboxready_api.services.batch_audit import (
+    audit_domains,
+    summarize_batch,
+    unique_normalized_domains,
+)
 from inboxready_api.services.provider_detection import detect_providers
+from inboxready_api.security import verify_password
+from inboxready_api.settings import Settings
+from inboxready_api.storage import MonitorRecord
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 
 client = TestClient(app)
+CSRF_PATTERN = re.compile(r'name="csrf_token" value="([^"]+)"')
+
+
+def csrf_token(browser: TestClient, path: str) -> str:
+    response = browser.get(path)
+    assert response.status_code == 200
+    match = CSRF_PATTERN.search(response.text)
+    assert match is not None
+    return match.group(1)
+
+
+def provision_api_key(plan: str = "free") -> str:
+    response = client.post(
+        "/v1/accounts",
+        json={
+            "email": f"test-{uuid4()}@example.com",
+            "plan": plan,
+            "key_name": "pytest",
+        },
+    )
+    assert response.status_code == 200
+    return response.json()["api_key"]
 
 
 def test_parse_spf_record_counts_direct_lookups() -> None:
@@ -86,10 +134,42 @@ def test_workspace_page_renders() -> None:
     assert "Run Domain Audit" in response.text
 
 
+def test_changelog_page_renders() -> None:
+    response = client.get("/changelog")
+
+    assert response.status_code == 200
+    assert "Track what changed" in response.text
+    assert "v1.0.0" in response.text
+    assert "Roadmap" in response.text
+
+
+def test_ops_page_renders() -> None:
+    response = client.get("/ops")
+
+    assert response.status_code == 200
+    assert "Production readiness" in response.text
+    assert "Current runtime signals" in response.text
+
+
 def test_unique_normalized_domains_keeps_first_seen_order() -> None:
     domains = unique_normalized_domains(["https://Example.com/app", "example.com", "api.example.com"])
 
     assert domains == ["example.com", "api.example.com"]
+
+
+def test_domain_input_is_canonicalized() -> None:
+    request = DomainAuditRequest(domain="https://Bücher.example/path?q=1")
+
+    assert request.domain == "xn--bcher-kva.example"
+
+
+@pytest.mark.parametrize(
+    "domain",
+    ["localhost", "127.0.0.1", "bad_domain.example", "example.com:443"],
+)
+def test_domain_input_rejects_unsafe_or_invalid_hosts(domain: str) -> None:
+    with pytest.raises(ValidationError):
+        DomainAuditRequest(domain=domain)
 
 
 def test_batch_summary_prioritizes_repeated_high_severity_recommendations() -> None:
@@ -155,6 +235,7 @@ def test_batch_endpoint_accepts_multiple_domains(monkeypatch) -> None:
 
     response = client.post(
         "/v1/audits/batch",
+        headers={"Authorization": f"Bearer {provision_api_key()}"},
         json=BatchAuditRequest(domains=["example.com", "https://openai.com/docs"]).model_dump(),
     )
 
@@ -163,3 +244,667 @@ def test_batch_endpoint_accepts_multiple_domains(monkeypatch) -> None:
     assert payload["summary"]["domain_count"] == 2
     assert payload["summary"]["average_score"] == 90.0
     assert [audit["domain"] for audit in payload["audits"]] == ["example.com", "openai.com"]
+
+
+def test_batch_audits_run_concurrently_and_preserve_order(monkeypatch) -> None:
+    lock = Lock()
+    active = 0
+    max_active = 0
+
+    def fake_audit_domain(request, settings):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        sleep(0.03)
+        with lock:
+            active -= 1
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=90,
+            overall_status="pass",
+            checked_at="2026-04-28T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.services.batch_audit.audit_domain", fake_audit_domain)
+    request = BatchAuditRequest(
+        domains=["alpha.example", "bravo.example", "charlie.example"]
+    )
+
+    result = audit_domains(request, Settings(batch_max_workers=3))
+
+    assert max_active >= 2
+    assert [audit.domain for audit in result.audits] == [
+        "alpha.example",
+        "bravo.example",
+        "charlie.example",
+    ]
+
+
+def test_audit_endpoint_requires_api_key() -> None:
+    response = client.post("/v1/audits/email-domain", json={"domain": "example.com"})
+
+    assert response.status_code == 401
+
+
+def test_public_account_creation_rejects_unpaid_paid_plan() -> None:
+    response = client.post(
+        "/v1/accounts",
+        json={"email": f"paid-{uuid4()}@example.com", "plan": "growth"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_account_creation_validates_email() -> None:
+    response = client.post(
+        "/v1/accounts",
+        json={"email": "not-an-email", "plan": "free"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_api_keys_can_be_listed_and_revoked() -> None:
+    primary_key = provision_api_key()
+    headers = {"Authorization": f"Bearer {primary_key}"}
+    created = client.post(
+        "/v1/api-keys",
+        headers=headers,
+        json={"name": "Temporary integration"},
+    )
+    assert created.status_code == 200
+    temporary_key = created.json()["api_key"]
+    temporary_key_id = created.json()["key"]["id"]
+
+    listed = client.get("/v1/api-keys", headers=headers)
+    assert listed.status_code == 200
+    assert temporary_key_id in {key["id"] for key in listed.json()["keys"]}
+
+    revoked = client.delete(f"/v1/api-keys/{temporary_key_id}", headers=headers)
+    assert revoked.status_code == 200
+    assert revoked.json()["revoked_at"] is not None
+
+    rejected = client.get(
+        "/v1/usage",
+        headers={"Authorization": f"Bearer {temporary_key}"},
+    )
+    assert rejected.status_code == 401
+
+
+def test_audit_history_limit_is_bounded() -> None:
+    api_key = provision_api_key()
+    response = client.get(
+        "/v1/audit-history?limit=101",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_readiness_checks_storage() -> None:
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready", "storage": "ok"}
+
+
+def test_request_id_header_is_returned() -> None:
+    response = client.get("/healthz", headers={"X-Request-ID": "pytest-request-id"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "pytest-request-id"
+
+
+def test_metrics_summary_reports_runtime_counters() -> None:
+    client.get("/healthz")
+    response = client.get("/v1/metrics/summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "inboxready-api"
+    assert payload["requests_total"] >= 1
+    assert payload["qps"] >= 0
+    assert payload["availability"]["success_percentage"] >= 0
+    assert isinstance(payload["recent_errors"], list)
+
+
+def test_prometheus_metrics_endpoint_returns_text() -> None:
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "inboxready_requests_total" in response.text
+    assert "inboxready_qps" in response.text
+
+
+def test_polling_health_endpoints_return_metrics() -> None:
+    short_poll = client.get("/v1/health/short-poll")
+    long_poll = client.get("/v1/health/long-poll?timeout_seconds=1")
+
+    assert short_poll.status_code == 200
+    assert short_poll.json()["metrics"]["service"] == "inboxready-api"
+    assert long_poll.status_code == 200
+    assert long_poll.json()["waited_seconds"] == 1
+
+
+def test_websocket_health_streams_metrics() -> None:
+    with client.websocket_connect("/ws/health") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["service"] == "inboxready-api"
+    assert "requests_total" in payload
+
+
+def test_api_root_exposes_changelog_metadata() -> None:
+    response = client.get("/api")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["changelog"] == "/changelog"
+    assert payload["operations"] == "/ops"
+    assert payload["monitors"] == "/v1/monitors"
+    assert payload["metrics"] == "/metrics"
+    assert payload["websocket_health"] == "/ws/health"
+    assert payload["audit_jobs"] == "/v1/audit-jobs"
+    assert payload["exports"] == "/v1/exports"
+    assert payload["rpc"] == "/v1/rpc"
+    assert payload["due_monitors"] == "/v1/monitors/run-due"
+    assert payload["audit_playbook"] == "/v1/audit-history/{audit_id}/playbook"
+    assert payload["latest_release"]["version"] == "1.0.0"
+
+
+def test_remediation_plan_builds_customer_ready_tasks() -> None:
+    audit = DomainAuditResponse(
+        domain="customer.example",
+        score=38,
+        overall_status="fail",
+        checked_at="2026-06-30T00:00:00+00:00",
+        providers=[],
+        checks={
+            "dmarc": AuditCheck(
+                status="fail",
+                summary="No DMARC record was found.",
+                details={},
+            ),
+            "spf": AuditCheck(
+                status="pass",
+                summary="SPF is present.",
+                details={},
+            ),
+        },
+        recommendations=[
+            Recommendation(
+                severity="high",
+                code="dmarc-missing",
+                message="Publish a DMARC record, even if you start with p=none.",
+                details="Create _dmarc.customer.example as a TXT record.",
+            )
+        ],
+        references=[],
+    )
+
+    plan = build_remediation_plan(audit)
+
+    assert plan.readiness_stage == "blocked"
+    assert "Do not launch" in plan.launch_decision
+    assert plan.protocol_coverage[0].name == "DMARC policy"
+    assert plan.tasks[0].owner == "DNS administrator"
+    assert plan.tasks[0].effort == "Same day"
+
+
+def test_dashboard_insights_prioritize_recent_risk() -> None:
+    usage = PlanUsageResponse(
+        plan="free",
+        monthly_audit_limit=100,
+        rate_limit_per_minute=15,
+        current_period_start="2026-06-01T00:00:00+00:00",
+        audits_used=82,
+        audits_remaining=18,
+    )
+    audit_history = AuditHistoryResponse(
+        usage=usage,
+        audits=[
+            AuditHistoryItem(
+                id="audit-1",
+                domain="broken.example",
+                score=42,
+                overall_status="fail",
+                units=1,
+                created_at="2026-06-29T00:00:00+00:00",
+            ),
+            AuditHistoryItem(
+                id="audit-2",
+                domain="healthy.example",
+                score=96,
+                overall_status="pass",
+                units=1,
+                created_at="2026-06-28T00:00:00+00:00",
+            ),
+        ],
+    )
+    monitors = [
+        MonitorRecord(
+            id="monitor-1",
+            account_id="account-1",
+            domain="watch.example",
+            selectors=[],
+            expected_providers=[],
+            cadence="weekly",
+            last_audit_id="audit-3",
+            last_score=70,
+            last_status="warn",
+            last_checked_at="2026-06-27T00:00:00+00:00",
+            created_at="2026-06-26T00:00:00+00:00",
+            updated_at="2026-06-27T00:00:00+00:00",
+        ),
+        MonitorRecord(
+            id="monitor-2",
+            account_id="account-1",
+            domain="pending.example",
+            selectors=[],
+            expected_providers=[],
+            cadence="manual",
+            last_audit_id=None,
+            last_score=None,
+            last_status=None,
+            last_checked_at=None,
+            created_at="2026-06-26T00:00:00+00:00",
+            updated_at="2026-06-26T00:00:00+00:00",
+        ),
+    ]
+
+    insights = build_dashboard_insights(
+        usage=usage,
+        audit_history=audit_history,
+        monitors=monitors,
+    )
+
+    attention = next(item for item in insights["summary"] if item["label"] == "Needs attention")
+    usage_headroom = next(item for item in insights["summary"] if item["label"] == "Usage headroom")
+
+    assert attention["value"] == "2"
+    assert attention["tone"] == "fail"
+    assert usage_headroom["tone"] == "warn"
+    assert insights["action_queue"][0]["title"] == "Review broken.example"
+    assert insights["focus_domains"][0]["domain"] == "broken.example"
+
+
+def test_account_usage_and_history_are_metered(monkeypatch) -> None:
+    def fake_audit_domain(request, settings):
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=88,
+            overall_status="pass",
+            checked_at="2026-04-28T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domain", fake_audit_domain)
+    api_key = provision_api_key()
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    response = client.post("/v1/audits/email-domain", headers=headers, json={"domain": "example.com"})
+
+    assert response.status_code == 200
+    usage = client.get("/v1/usage", headers=headers)
+    assert usage.status_code == 200
+    assert usage.json()["audits_used"] >= 1
+
+    history = client.get("/v1/audit-history", headers=headers)
+    assert history.status_code == 200
+    assert history.json()["audits"][0]["domain"] == "example.com"
+    audit_id = history.json()["audits"][0]["id"]
+
+    detail = client.get(f"/v1/audit-history/{audit_id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["audit"]["domain"] == "example.com"
+    assert detail.json()["units"] == 1
+
+    playbook = client.get(f"/v1/audit-history/{audit_id}/playbook", headers=headers)
+    assert playbook.status_code == 200
+    assert playbook.json()["domain"] == "example.com"
+    assert playbook.json()["readiness_stage"] == "ready"
+
+    export = client.post(
+        "/v1/exports/audit-history",
+        headers=headers,
+        json={"format": "json", "limit": 10},
+    )
+    assert export.status_code == 200
+    export_payload = export.json()
+    assert export_payload["kind"] == "audit_history"
+    assert export_payload["format"] == "json"
+
+    listed_exports = client.get("/v1/exports", headers=headers)
+    assert listed_exports.status_code == 200
+    assert listed_exports.json()["exports"][0]["id"] == export_payload["id"]
+
+    downloaded_export = client.get(export_payload["download_url"], headers=headers)
+    assert downloaded_export.status_code == 200
+    assert "example.com" in downloaded_export.text
+
+    csv_export = client.get("/v1/audit-history.csv", headers=headers)
+    assert csv_export.status_code == 200
+    assert "text/csv" in csv_export.headers["content-type"]
+    assert "domain,score,overall_status" in csv_export.text
+    assert "example.com" in csv_export.text
+
+
+def test_audit_jobs_and_rpc_paths(monkeypatch) -> None:
+    def fake_audit_domain(request, settings):
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=94,
+            overall_status="pass",
+            checked_at="2026-06-30T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domain", fake_audit_domain)
+    api_key = provision_api_key()
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    created = client.post(
+        "/v1/audit-jobs/email-domain",
+        headers=headers,
+        json={"domain": "queued.example"},
+    )
+    assert created.status_code == 200
+    job_id = created.json()["id"]
+
+    waited = client.get(f"/v1/audit-jobs/{job_id}/wait?timeout_seconds=1", headers=headers)
+    assert waited.status_code == 200
+    if waited.json()["status"] != "succeeded":
+        waited = client.post(f"/v1/audit-jobs/{job_id}/run", headers=headers)
+    assert waited.json()["status"] == "succeeded"
+    assert waited.json()["audit"]["domain"] == "queued.example"
+
+    listed = client.get("/v1/audit-jobs", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["jobs"][0]["id"] == job_id
+
+    rpc_health = client.post(
+        "/v1/rpc",
+        headers=headers,
+        json={"method": "inboxready.health", "params": {}, "id": "health-1"},
+    )
+    assert rpc_health.status_code == 200
+    assert rpc_health.json()["ok"] is True
+    assert rpc_health.json()["result"]["status"] == "ok"
+
+
+def test_monitors_can_be_created_run_and_deleted(monkeypatch) -> None:
+    def fake_audit_domain(request, settings):
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=83,
+            overall_status="warn",
+            checked_at="2026-06-27T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domain", fake_audit_domain)
+    api_key = provision_api_key()
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    created = client.post(
+        "/v1/monitors",
+        headers=headers,
+        json={
+            "domain": "https://Customer-Example.com/setup",
+            "selectors": ["google"],
+            "expected_providers": ["Google Workspace"],
+            "cadence": "weekly",
+        },
+    )
+
+    assert created.status_code == 200
+    monitor = created.json()
+    assert monitor["domain"] == "customer-example.com"
+    assert monitor["last_score"] is None
+
+    listed = client.get("/v1/monitors", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["monitors"][0]["id"] == monitor["id"]
+
+    due = client.post("/v1/monitors/run-due?limit=5", headers=headers)
+    assert due.status_code == 200
+    assert due.json()["monitors_checked"] == 1
+    assert due.json()["audits"][0]["audit"]["score"] == 83
+
+    run = client.post(f"/v1/monitors/{monitor['id']}/run", headers=headers)
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["audit"]["score"] == 83
+    assert payload["monitor"]["last_score"] == 83
+    assert payload["monitor"]["last_status"] == "warn"
+    assert payload["monitor"]["last_audit_id"]
+
+    history = client.get("/v1/audit-history", headers=headers)
+    assert history.status_code == 200
+    assert history.json()["audits"][0]["domain"] == "customer-example.com"
+
+    deleted = client.delete(f"/v1/monitors/{monitor['id']}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json()["domain"] == "customer-example.com"
+
+    empty = client.get("/v1/monitors", headers=headers)
+    assert empty.status_code == 200
+    assert empty.json()["monitors"] == []
+
+
+def test_demo_endpoint_does_not_require_api_key(monkeypatch) -> None:
+    def fake_audit_domain(request, settings):
+        return DomainAuditResponse(
+            domain=request.domain,
+            score=72,
+            overall_status="warn",
+            checked_at="2026-04-28T00:00:00+00:00",
+            providers=[],
+            checks={},
+            recommendations=[],
+            references=[],
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domain", fake_audit_domain)
+
+    response = client.post("/demo/audit", json={"domain": "example.com"})
+
+    assert response.status_code == 200
+    assert response.json()["score"] == 72
+
+
+def test_signup_creates_session_and_dashboard_access() -> None:
+    browser = TestClient(app)
+    email = f"signup-{uuid4()}@example.com"
+    token = csrf_token(browser, "/signup")
+    response = browser.post(
+        "/signup",
+        data={
+            "csrf_token": token,
+            "email": email,
+            "password": "LaunchPass123",
+            "key_name": "Dashboard key",
+            "next": "/dashboard",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard"
+
+    dashboard = browser.get("/dashboard")
+    assert dashboard.status_code == 200
+    assert email in dashboard.text
+    assert "Store this API key now" in dashboard.text
+    assert "Health insights" in dashboard.text
+    assert "Action queue" in dashboard.text
+    assert "Customer playbook" in dashboard.text
+    assert "/dashboard/audit-history.csv" in dashboard.text
+    assert "Domain monitors" in dashboard.text
+
+
+def test_dashboard_monitor_form_creates_watchlist() -> None:
+    browser = TestClient(app)
+    email = f"monitor-dashboard-{uuid4()}@example.com"
+    signup_token = csrf_token(browser, "/signup")
+    signup = browser.post(
+        "/signup",
+        data={
+            "csrf_token": signup_token,
+            "email": email,
+            "password": "LaunchPass123",
+            "key_name": "Dashboard key",
+            "next": "/dashboard",
+        },
+        follow_redirects=False,
+    )
+    assert signup.status_code == 303
+
+    dashboard_token = csrf_token(browser, "/dashboard")
+    response = browser.post(
+        "/dashboard/monitors",
+        data={
+            "csrf_token": dashboard_token,
+            "domain": "https://dashboard-monitor.example/path",
+            "selectors": "google, selector1",
+            "expected_providers": "Google Workspace",
+            "cadence": "monthly",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard#monitors"
+
+    dashboard = browser.get("/dashboard")
+    assert dashboard.status_code == 200
+    assert "dashboard-monitor.example" in dashboard.text
+    assert "Monthly" in dashboard.text
+
+
+def test_dashboard_redirects_when_not_logged_in() -> None:
+    anonymous = TestClient(app)
+    response = anonymous.get("/dashboard", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/login")
+
+
+def test_support_form_accepts_submission() -> None:
+    browser = TestClient(app)
+    token = csrf_token(browser, "/support")
+    response = browser.post(
+        "/support",
+        data={
+            "csrf_token": token,
+            "email": f"support-{uuid4()}@example.com",
+            "subject": "Need help with onboarding",
+            "message": "We are configuring a customer domain and need help understanding the audit output.",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/support"
+
+
+def test_session_forms_reject_missing_csrf_token() -> None:
+    browser = TestClient(app)
+    response = browser.post(
+        "/signup",
+        data={
+            "email": f"csrf-{uuid4()}@example.com",
+            "password": "LaunchPass123",
+            "key_name": "Blocked key",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid CSRF token."
+
+
+def test_pages_include_defensive_security_headers() -> None:
+    response = TestClient(app).get("/")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        "not-a-password-hash",
+        "pbkdf2_sha256$nope$00$00",
+        "pbkdf2_sha256$999999999$00$00",
+    ],
+)
+def test_malformed_password_hashes_fail_closed(encoded: str) -> None:
+    assert verify_password("LaunchPass123", encoded) is False
+
+
+def test_dashboard_batch_audit_uses_session(monkeypatch) -> None:
+    authenticated = TestClient(app)
+    email = f"batch-session-{uuid4()}@example.com"
+    signup_token = csrf_token(authenticated, "/signup")
+    signup = authenticated.post(
+        "/signup",
+        data={
+            "csrf_token": signup_token,
+            "email": email,
+            "password": "LaunchPass123",
+            "key_name": "Dashboard key",
+            "next": "/dashboard",
+        },
+        follow_redirects=False,
+    )
+    assert signup.status_code == 303
+
+    def fake_audit_domains(request, settings):
+        return BatchAuditResponse(
+            audits=[
+                DomainAuditResponse(
+                    domain="example.com",
+                    score=91,
+                    overall_status="pass",
+                    checked_at="2026-04-28T00:00:00+00:00",
+                    providers=[],
+                    checks={},
+                    recommendations=[],
+                    references=[],
+                )
+            ],
+            summary={
+                "domain_count": 1,
+                "average_score": 91.0,
+                "status_counts": {"pass": 1},
+                "priority_recommendations": [],
+            },
+        )
+
+    monkeypatch.setattr("inboxready_api.main.audit_domains", fake_audit_domains)
+
+    dashboard_token = csrf_token(authenticated, "/dashboard")
+    response = authenticated.post(
+        "/dashboard/audits/batch",
+        headers={"X-CSRF-Token": dashboard_token},
+        json={"domains": ["example.com"], "selectors": [], "expected_providers": []},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["average_score"] == 91.0

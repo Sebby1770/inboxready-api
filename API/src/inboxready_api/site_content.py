@@ -85,6 +85,73 @@ FLOW_STEPS = [
     },
 ]
 
+OPS_CAPABILITIES = [
+    {
+        "name": "Container staging",
+        "status": "Implemented",
+        "detail": (
+            "Docker Compose runs the API behind Nginx with health checks, request IDs, "
+            "caching, rate limits, and WebSocket upgrades."
+        ),
+    },
+    {
+        "name": "Vercel previews",
+        "status": "Implemented",
+        "detail": (
+            "A Vercel Python Function adapter, routing config, dependency manifest, and "
+            "GitHub workflows support preview and production deployments."
+        ),
+    },
+    {
+        "name": "CI/CD",
+        "status": "Implemented",
+        "detail": (
+            "GitHub Actions compile the package, run tests, and publish a GHCR container "
+            "image from release branches."
+        ),
+    },
+    {
+        "name": "Runtime metrics",
+        "status": "Implemented",
+        "detail": (
+            "Prometheus and JSON endpoints report request volume, QPS, throughput, "
+            "latency, availability, status codes, and recent errors."
+        ),
+    },
+    {
+        "name": "Kubernetes",
+        "status": "Ready path",
+        "detail": (
+            "Manifests cover deployment, service, ingress, probes, secrets, config, "
+            "and autoscaling once storage is externalized."
+        ),
+    },
+    {
+        "name": "Queues and object storage",
+        "status": "Implemented",
+        "detail": (
+            "Audit jobs now run through a persisted queue abstraction, and audit-history "
+            "exports are archived into a local S3-style object store."
+        ),
+    },
+    {
+        "name": "RPC and worker hooks",
+        "status": "Implemented",
+        "detail": (
+            "RPC commands, long-poll job waits, manual job execution, and due-monitor runs "
+            "create a clean path to Lambda, SQS, RabbitMQ, or Kafka later."
+        ),
+    },
+    {
+        "name": "Secure operations",
+        "status": "Implemented",
+        "detail": (
+            "CSRF, secure hashing, defensive headers, Stripe signature checks, TLS-ready "
+            "ingress, and no plain FTP by design."
+        ),
+    },
+]
+
 PRICING_TIERS = [
     {
         "name": "Starter",
@@ -152,8 +219,242 @@ FAQS = [
     {
         "question": "What would you build next after this MVP?",
         "answer": (
-            "API keys, usage metering, stored audit history, Stripe billing, scheduled "
-            "re-checks, webhook alerts, and branded remediation guides."
+            "API keys, usage metering, stored audit history, and Stripe billing hooks are now "
+            "in the launch layer. Queue-backed audits, due-monitor runs, and remediation "
+            "playbooks are now available; webhook alerts are the next retention feature."
+        ),
+    },
+]
+
+CHANGELOG_ENTRIES = [
+    {
+        "version": "1.0.0",
+        "date": "2026-07-01",
+        "display_date": "July 1, 2026",
+        "status": "Current release",
+        "title": "InboxReady is now Vercel-ready for preview and production deploys.",
+        "summary": (
+            "This release adds a Vercel deployment lane so the FastAPI product can ship "
+            "preview URLs, production deploys, and GitHub-based release workflows."
+        ),
+        "highlights": [
+            "Added a Vercel Python Function adapter at API/index.py.",
+            "Added vercel.json routing, function duration config, deployment headers, and .vercelignore.",
+            "Added root requirements.txt so Vercel can install the Python runtime dependencies.",
+            "Added GitHub Actions workflows for Vercel preview and production deployments.",
+        ],
+        "impact": (
+            "Best for demos, investor/customer previews, and a low-ops launch lane before "
+            "the app needs durable managed storage behind the Vercel runtime."
+        ),
+    },
+    {
+        "version": "0.9.0",
+        "date": "2026-07-01",
+        "display_date": "July 1, 2026",
+        "status": "Queue and RPC",
+        "title": "InboxReady now has queue, archive, worker, and RPC surfaces.",
+        "summary": (
+            "This release turns more of the infrastructure checklist into usable product "
+            "capabilities: async audit jobs, archived exports, scheduled monitor hooks, and RPC."
+        ),
+        "highlights": [
+            "Added queue-backed audit jobs with create, list, get, run, and long-poll wait endpoints.",
+            "Added S3-style audit-history export objects with JSON/CSV archive creation, listing, and download.",
+            "Added due-monitor execution for cron or Lambda-style scheduled checks.",
+            "Added /v1/rpc for health, metrics, providers, synchronous audits, and queued audits.",
+        ],
+        "impact": (
+            "Best for customers that want InboxReady to fit worker queues, serverless jobs, "
+            "internal RPC clients, and archive workflows without forcing a cloud migration yet."
+        ),
+    },
+    {
+        "version": "0.8.0",
+        "date": "2026-06-30",
+        "display_date": "June 30, 2026",
+        "status": "Remediation playbooks",
+        "title": "InboxReady now turns saved audits into customer-ready playbooks.",
+        "summary": (
+            "This release adds launch decisions, protocol coverage, and owner-ready remediation "
+            "tasks so teams can move from raw DNS findings to clear customer action plans."
+        ),
+        "highlights": [
+            "Added remediation playbook models and saved-audit playbook endpoints for API and dashboard users.",
+            "Added dashboard customer playbooks with launch decisions, protocol coverage, score cards, and task owners.",
+            "Added live audit playbook guidance so demos immediately show what to do next.",
+            "Added playbook links beside saved audit history rows for faster support handoff.",
+        ],
+        "impact": (
+            "Best for customer support, success, and onboarding teams that need audit output "
+            "to become a clear customer-facing checklist."
+        ),
+    },
+    {
+        "version": "0.7.0",
+        "date": "2026-06-30",
+        "display_date": "June 30, 2026",
+        "status": "Operations layer",
+        "title": "InboxReady now has a real production operations layer.",
+        "summary": (
+            "This release adds deployable infrastructure assets and live runtime signals so "
+            "teams can stage, monitor, and scale the API with less guesswork."
+        ),
+        "highlights": [
+            "Added request IDs, structured access/error logs, QPS, throughput, latency, and availability metrics.",
+            "Added Prometheus-style /metrics, JSON /v1/metrics/summary, WebSocket health, and polling endpoints.",
+            "Added Docker Compose staging, Nginx proxy/cache/rate-limit config, and Kubernetes manifests.",
+            "Added GitHub Actions for CI and GHCR container publishing.",
+        ],
+        "impact": (
+            "Best for turning the MVP into something an early B2B buyer can evaluate as an "
+            "operated API product, not just a local demo."
+        ),
+    },
+    {
+        "version": "0.6.0",
+        "date": "2026-06-29",
+        "display_date": "June 29, 2026",
+        "status": "Health insights",
+        "title": "InboxReady now turns dashboard activity into operator priorities.",
+        "summary": (
+            "This release adds a health insight layer that summarizes recent audits, monitor "
+            "coverage, attention domains, and usage headroom inside the dashboard."
+        ),
+        "highlights": [
+            "Added dashboard health insights that combine usage, audit history, and monitor state.",
+            "Added an action queue for failed audits, unchecked monitors, and plan-capacity risk.",
+            "Added domains-to-watch rows that help operators spot the accounts worth revisiting.",
+            "Added responsive styling for the new insight panel across desktop and mobile layouts.",
+        ],
+        "impact": (
+            "Best for support and customer-success teams that need InboxReady to recommend "
+            "the next operational move, not just display raw audit results."
+        ),
+    },
+    {
+        "version": "0.5.0",
+        "date": "2026-06-28",
+        "display_date": "June 28, 2026",
+        "status": "Visual refresh",
+        "title": "InboxReady got a sharper Lovable-inspired product interface.",
+        "summary": (
+            "This release refreshes the visual system so the product feels more like a "
+            "credible SaaS console for operators, support teams, and API buyers."
+        ),
+        "highlights": [
+            "Reworked the palette, shadows, radii, and typography for a cleaner B2B SaaS feel.",
+            "Added a landing-page operations strip for monitors, exports, and batch reviews.",
+            "Added a dashboard command strip for faster navigation between core operator workflows.",
+            "Added a monthly usage meter that makes plan consumption easier to scan.",
+        ],
+        "impact": (
+            "Best for first impressions, demos, and buyers who need the dashboard to feel "
+            "trustworthy before they wire InboxReady into customer onboarding."
+        ),
+    },
+    {
+        "version": "0.4.0",
+        "date": "2026-06-27",
+        "display_date": "June 27, 2026",
+        "status": "Domain monitors",
+        "title": "InboxReady now tracks domains instead of only auditing them once.",
+        "summary": (
+            "This release adds account-level domain monitors so teams can keep important "
+            "customer senders on a watchlist and refresh their readiness when needed."
+        ),
+        "highlights": [
+            "Added monitor create, list, run, and delete endpoints for API customers.",
+            "Added dashboard monitor forms with last score, status, checked time, and run-now controls.",
+            "Persisted monitor cadence, selectors, expected providers, and latest audit metadata in SQLite.",
+            "Connected monitor runs to the existing usage meter and saved audit history.",
+        ],
+        "impact": (
+            "Best for support and success teams that need repeatable follow-up on customer "
+            "domains instead of one-off DNS checks."
+        ),
+    },
+    {
+        "version": "0.3.0",
+        "date": "2026-06-26",
+        "display_date": "June 26, 2026",
+        "status": "History exports",
+        "title": "InboxReady now feels maintained like a product, not a hidden backend.",
+        "summary": (
+            "This release turns saved audits and product updates into visible operating surfaces "
+            "while extending the account workflow for multi-domain reviews."
+        ),
+        "highlights": [
+            "Added a public changelog page, dashboard release card, and landing-page shipping notes.",
+            "Extended the dashboard with authenticated batch audits for customer portfolios and shared usage enforcement.",
+            "Added CSV export and saved-audit JSON views so teams can inspect or move audit history downstream.",
+            "Expanded launch documentation and API metadata so prospects can understand the product state quickly.",
+        ],
+        "impact": (
+            "Best for design partners, support leads, and buyers who want proof that the product is "
+            "shipping and getting safer over time."
+        ),
+    },
+    {
+        "version": "0.2.0",
+        "date": "2026-06-22",
+        "display_date": "June 22, 2026",
+        "status": "Launch surface",
+        "title": "The API grew a real SaaS shell around the audit engine.",
+        "summary": (
+            "InboxReady moved beyond a single endpoint and added the customer-facing surfaces "
+            "needed for onboarding, support, billing, and trust."
+        ),
+        "highlights": [
+            "Added signup, login, session-backed dashboard access, and one-time API key reveal flows.",
+            "Introduced usage metering, saved audit history, Stripe hooks, and support/legal pages.",
+            "Hardened session security with CSRF protection, secure password handling, and defensive headers.",
+        ],
+        "impact": (
+            "Best for early paying customers who need more than a raw API response before they can deploy."
+        ),
+    },
+    {
+        "version": "0.1.0",
+        "date": "2026-04-28",
+        "display_date": "April 28, 2026",
+        "status": "Initial release",
+        "title": "Core domain-readiness auditing shipped.",
+        "summary": (
+            "The initial release established the DNS audit engine and provider detection model "
+            "for sender-domain onboarding."
+        ),
+        "highlights": [
+            "Shipped MX, SPF, DMARC, DKIM, BIMI, MTA-STS, and TLS-RPT checks.",
+            "Added provider fingerprinting, weighted scoring, and remediation recommendations.",
+            "Exposed a clean FastAPI service with versioned endpoints and interactive docs.",
+        ],
+        "impact": "Best for proving the API wedge before layering on accounts and commercial workflows.",
+    },
+]
+
+LATEST_CHANGELOG = CHANGELOG_ENTRIES[0]
+
+ROADMAP_ITEMS = [
+    {
+        "title": "Automated schedule execution",
+        "body": (
+            "Run stored weekly and monthly monitors without a manual button press, then surface "
+            "fresh warnings before support tickets arrive."
+        ),
+    },
+    {
+        "title": "Webhook alerts",
+        "body": (
+            "Push failed or regressed domain states into product workflows, ticketing systems, "
+            "or internal ops channels."
+        ),
+    },
+    {
+        "title": "Team reporting",
+        "body": (
+            "Give customer success and deliverability teams shared visibility into accounts, "
+            "portfolio trends, and repeated remediation patterns."
         ),
     },
 ]
@@ -169,7 +470,10 @@ SAMPLE_CURL = """curl -X POST https://api.inboxready.dev/v1/audits/email-domain 
 
 SAMPLE_JS = """const response = await fetch("/v1/audits/email-domain", {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Authorization": `Bearer ${process.env.INBOXREADY_API_KEY}`,
+    "Content-Type": "application/json"
+  },
   body: JSON.stringify({
     domain: "customer-example.com",
     selectors: ["google", "selector1"]
@@ -178,4 +482,3 @@ SAMPLE_JS = """const response = await fetch("/v1/audits/email-domain", {
 
 const audit = await response.json();
 console.log(audit.score, audit.recommendations);"""
-

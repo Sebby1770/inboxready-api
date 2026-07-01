@@ -16,19 +16,124 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function parseDomains(value) {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function getStatusLabel(status) {
-  return {
-    pass: "Ready",
-    warn: "Needs work",
-    fail: "Broken",
-    info: "Optional",
-  }[status] || "Unknown";
+  return (
+    {
+      pass: "Ready",
+      warn: "Needs work",
+      fail: "Broken",
+      info: "Optional",
+    }[status] || "Unknown"
+  );
 }
 
 function getScoreColor(score) {
   if (score >= 85) return "#1f7a56";
   if (score >= 65) return "#aa6b10";
   return "#b23b33";
+}
+
+const PROTOCOL_LABELS = {
+  mx: "MX routing",
+  spf: "SPF authorization",
+  dmarc: "DMARC policy",
+  dkim: "DKIM signatures",
+  bimi: "BIMI branding",
+  mta_sts: "MTA-STS transport",
+  tls_rpt: "TLS-RPT reporting",
+};
+
+const TASK_OWNER_BY_CODE = {
+  "mx-missing": "DNS administrator",
+  "spf-missing": "DNS administrator",
+  "spf-too-many-lookups": "DNS administrator",
+  "dmarc-missing": "DNS administrator",
+  "dmarc-monitoring-only": "Deliverability owner",
+  "dkim-missing": "Product onboarding",
+  "provider-mismatch": "Product onboarding",
+  "bimi-missing": "Brand or marketing",
+  "mta-sts-missing": "Security engineering",
+  "tls-rpt-missing": "Security engineering",
+};
+
+const TASK_EFFORT_BY_SEVERITY = {
+  high: "Same day",
+  medium: "30-60 min",
+  low: "15-30 min",
+};
+
+function getReadinessStage(audit) {
+  if (
+    audit.overall_status === "fail" ||
+    audit.recommendations.some((item) => item.severity === "high")
+  ) {
+    return "blocked";
+  }
+  if (audit.overall_status === "warn" || audit.score < 85) {
+    return "review";
+  }
+  return "ready";
+}
+
+function getLaunchDecision(stage) {
+  if (stage === "blocked") {
+    return "Do not launch customer sending from this domain until the high-priority DNS items are fixed.";
+  }
+  if (stage === "review") {
+    return "Launch cautiously only after reviewing the warning items and confirming the expected sender setup.";
+  }
+  return "This domain is ready for customer sending based on the current authentication posture.";
+}
+
+function renderAuditPlaybook(audit) {
+  const stage = getReadinessStage(audit);
+  const protocolPills = Object.entries(audit.checks)
+    .map(
+      ([key, check]) =>
+        `<span class="protocol-pill protocol-${escapeHtml(check.status)}">${escapeHtml(
+          PROTOCOL_LABELS[key] || key.replaceAll("_", " ").toUpperCase(),
+        )}</span>`,
+    )
+    .join("");
+
+  const tasks = audit.recommendations.length
+    ? audit.recommendations
+        .slice(0, 4)
+        .map((item) => {
+          const owner = TASK_OWNER_BY_CODE[item.code] || "DNS or deliverability owner";
+          const effort = TASK_EFFORT_BY_SEVERITY[item.severity] || "30-60 min";
+          return `
+            <article class="playbook-task playbook-${escapeHtml(item.severity)}">
+              <div>
+                <span>${escapeHtml(owner)} · ${escapeHtml(effort)}</span>
+                <strong>${escapeHtml(item.message)}</strong>
+                ${item.details ? `<p>${escapeHtml(item.details)}</p>` : ""}
+              </div>
+              <em>${escapeHtml(item.severity)}</em>
+            </article>
+          `;
+        })
+        .join("")
+    : '<div class="result-empty">No launch-blocking tasks were generated from this audit.</div>';
+
+  return `
+    <div class="provider-list audit-playbook">
+      <div class="playbook-mini-header">
+        <h4>Launch playbook</h4>
+        <span class="panel-badge">${escapeHtml(stage)}</span>
+      </div>
+      <p class="playbook-decision">${escapeHtml(getLaunchDecision(stage))}</p>
+      <div class="protocol-strip">${protocolPills}</div>
+      <div class="playbook-task-list">${tasks}</div>
+    </div>
+  `;
 }
 
 function recentDomains() {
@@ -50,7 +155,8 @@ function renderRecentDomains(container, onSelect) {
 
   const items = recentDomains();
   if (!items.length) {
-    container.innerHTML = '<p class="result-empty">Recent test domains will appear here.</p>';
+    container.innerHTML =
+      '<p class="result-empty">Recent test domains will appear here.</p>';
     return;
   }
 
@@ -92,12 +198,21 @@ function renderErrorState(target, message) {
   `;
 }
 
+function renderBatchEmptyState(target) {
+  target.innerHTML = `
+    <div class="result-empty">
+      <h3>Batch review ready</h3>
+      <p>Submit up to 10 domains to compare scores, shared issues, and repeated remediation patterns.</p>
+    </div>
+  `;
+}
+
 function renderAudit(target, audit) {
   const providers = audit.providers.length
     ? audit.providers
         .map(
           (provider) =>
-            `<span class="provider-chip">${escapeHtml(provider.name)} · ${Math.round(provider.confidence * 100)}%</span>`
+            `<span class="provider-chip">${escapeHtml(provider.name)} · ${Math.round(provider.confidence * 100)}%</span>`,
         )
         .join("")
     : '<p class="result-empty">No provider fingerprint matched the DNS evidence.</p>';
@@ -106,13 +221,19 @@ function renderAudit(target, audit) {
     .map(([name, check]) => {
       const detailBits = [];
       if (check.details?.record) {
-        detailBits.push(`<div><strong>Record:</strong> ${escapeHtml(check.details.record)}</div>`);
+        detailBits.push(
+          `<div><strong>Record:</strong> ${escapeHtml(check.details.record)}</div>`,
+        );
       }
       if (check.details?.policy) {
-        detailBits.push(`<div><strong>Policy:</strong> ${escapeHtml(check.details.policy)}</div>`);
+        detailBits.push(
+          `<div><strong>Policy:</strong> ${escapeHtml(check.details.policy)}</div>`,
+        );
       }
       if (check.details?.records?.length) {
-        detailBits.push(`<div><strong>Found:</strong> ${escapeHtml(check.details.records.join(", "))}</div>`);
+        detailBits.push(
+          `<div><strong>Found:</strong> ${escapeHtml(check.details.records.join(", "))}</div>`,
+        );
       }
       return `
         <article class="check-card">
@@ -131,16 +252,21 @@ function renderAudit(target, audit) {
           (item) =>
             `<li><strong>${escapeHtml(item.severity)}</strong> · ${escapeHtml(item.message)}${
               item.details ? ` <span>${escapeHtml(item.details)}</span>` : ""
-            }</li>`
+            }</li>`,
         )
         .join("")
     : "<li>No urgent remediation items. This domain is in a good place.</li>";
 
   const references = audit.references.length
     ? `<ul>${audit.references
-        .map((reference) => `<li><a href="${escapeHtml(reference)}" target="_blank" rel="noreferrer">${escapeHtml(reference)}</a></li>`)
+        .map(
+          (reference) =>
+            `<li><a href="${escapeHtml(reference)}" target="_blank" rel="noreferrer">${escapeHtml(reference)}</a></li>`,
+        )
         .join("")}</ul>`
     : "<p>No references returned.</p>";
+
+  const playbook = renderAuditPlaybook(audit);
 
   target.innerHTML = `
     <div class="audit-report">
@@ -169,6 +295,8 @@ function renderAudit(target, audit) {
             <div class="recent-domains">${providers}</div>
           </div>
 
+          ${playbook}
+
           <div class="recommendations">
             <h4>Recommended next actions</h4>
             <ul>${recommendations}</ul>
@@ -189,8 +317,41 @@ function renderAudit(target, audit) {
   `;
 }
 
-async function runAudit(payload) {
-  const response = await fetch("/v1/audits/email-domain", {
+async function runAudit(payload, endpoint = "/demo/audit") {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let message = `The API returned ${response.status}.`;
+    try {
+      const error = await response.json();
+      if (error?.detail) {
+        message =
+          typeof error.detail === "string"
+            ? error.detail
+            : JSON.stringify(error.detail);
+      }
+    } catch {
+      // No extra payload to parse.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+async function runBatchAudit(payload, endpoint) {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -203,7 +364,10 @@ async function runAudit(payload) {
     try {
       const error = await response.json();
       if (error?.detail) {
-        message = typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail);
+        message =
+          typeof error.detail === "string"
+            ? error.detail
+            : JSON.stringify(error.detail);
       }
     } catch {
       // No extra payload to parse.
@@ -219,7 +383,9 @@ function initAuditForm(form) {
   const recentTarget = document.getElementById(form.dataset.recentTarget);
   const domainInput = form.querySelector('input[name="domain"]');
   const selectorsInput = form.querySelector('input[name="selectors"]');
-  const expectedProvidersInput = form.querySelector('input[name="expected_providers"]');
+  const expectedProvidersInput = form.querySelector(
+    'input[name="expected_providers"]',
+  );
   const submitButton = form.querySelector('button[type="submit"]');
 
   if (!resultsTarget || !domainInput || !submitButton) return;
@@ -250,7 +416,10 @@ function initAuditForm(form) {
     renderLoadingState(resultsTarget, domain);
 
     try {
-      const audit = await runAudit(payload);
+      const audit = await runAudit(
+        payload,
+        form.dataset.endpoint || "/demo/audit",
+      );
       saveRecentDomain(audit.domain);
       renderAudit(resultsTarget, audit);
       renderRecentDomains(recentTarget, (recentDomain) => {
@@ -258,7 +427,10 @@ function initAuditForm(form) {
         form.requestSubmit();
       });
     } catch (error) {
-      renderErrorState(resultsTarget, error instanceof Error ? error.message : "Unknown error");
+      renderErrorState(
+        resultsTarget,
+        error instanceof Error ? error.message : "Unknown error",
+      );
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = submitButton.classList.contains("full-width")
@@ -276,8 +448,121 @@ function initAuditForm(form) {
   }
 }
 
+function renderBatchResult(target, payload) {
+  const recommendations = payload.summary.priority_recommendations.length
+    ? payload.summary.priority_recommendations
+        .map(
+          (item) =>
+            `<li><strong>${escapeHtml(item.severity)}</strong> · ${escapeHtml(item.message)} <span>${escapeHtml(
+              item.affected_domains.join(", "),
+            )}</span></li>`,
+        )
+        .join("")
+    : "<li>No repeated remediation patterns were detected.</li>";
+
+  const rows = payload.audits
+    .map(
+      (audit) => `
+        <div class="history-row">
+          <span>${escapeHtml(audit.domain)}</span>
+          <span>${escapeHtml(audit.score)}/100</span>
+          <span><span class="status-pill status-${escapeHtml(audit.overall_status)}">${getStatusLabel(
+            audit.overall_status,
+          )}</span></span>
+          <span>${escapeHtml(audit.checked_at)}</span>
+        </div>
+      `,
+    )
+    .join("");
+
+  target.innerHTML = `
+    <div class="audit-report">
+      <div class="stats-grid">
+        <article class="metric-card is-visible">
+          <strong>${escapeHtml(payload.summary.domain_count)}</strong>
+          <span>domains reviewed</span>
+        </article>
+        <article class="metric-card is-visible">
+          <strong>${escapeHtml(payload.summary.average_score)}</strong>
+          <span>average score</span>
+        </article>
+        <article class="metric-card is-visible">
+          <strong>${escapeHtml(payload.summary.status_counts.fail || 0)}</strong>
+          <span>failing domains</span>
+        </article>
+      </div>
+
+      <div class="provider-list">
+        <h4>Repeated recommendations</h4>
+        <ul>${recommendations}</ul>
+      </div>
+
+      <div class="history-table">
+        <div class="history-row history-head">
+          <span>Domain</span>
+          <span>Score</span>
+          <span>Status</span>
+          <span>Checked at</span>
+        </div>
+        ${rows}
+      </div>
+    </div>
+  `;
+}
+
+function initBatchForm(form) {
+  const resultsTarget = document.getElementById(form.dataset.resultsTarget);
+  const submitButton = form.querySelector('button[type="submit"]');
+  const domainsField = form.querySelector('textarea[name="domains"]');
+  const selectorsInput = form.querySelector('input[name="selectors"]');
+  const expectedProvidersInput = form.querySelector(
+    'input[name="expected_providers"]',
+  );
+
+  if (!resultsTarget || !submitButton || !domainsField) return;
+
+  renderBatchEmptyState(resultsTarget);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const domains = parseDomains(domainsField.value);
+    if (!domains.length) {
+      renderErrorState(resultsTarget, "Enter at least one domain.");
+      return;
+    }
+
+    const payload = {
+      domains,
+      selectors: parseCsv(selectorsInput?.value || ""),
+      expected_providers: parseCsv(expectedProvidersInput?.value || ""),
+    };
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Running…";
+    renderLoadingState(resultsTarget, `${domains.length} domains`);
+
+    try {
+      const result = await runBatchAudit(
+        payload,
+        form.dataset.endpoint || "/v1/audits/batch",
+      );
+      renderBatchResult(resultsTarget, result);
+    } catch (error) {
+      renderErrorState(
+        resultsTarget,
+        error instanceof Error ? error.message : "Unknown error",
+      );
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = "Run Batch Audit";
+    }
+  });
+}
+
 function initRevealAnimations() {
-  const items = document.querySelectorAll("[data-reveal], .hero-copy, .hero-panel");
+  const items = document.querySelectorAll(
+    "[data-reveal], .hero-copy, .hero-panel",
+  );
   if (!("IntersectionObserver" in window)) {
     items.forEach((item) => item.classList.add("is-visible"));
     return;
@@ -294,7 +579,7 @@ function initRevealAnimations() {
     },
     {
       threshold: 0.12,
-    }
+    },
   );
 
   items.forEach((item) => observer.observe(item));
@@ -308,14 +593,50 @@ async function initHealthIndicator() {
     const response = await fetch("/healthz");
     if (!response.ok) throw new Error("not ok");
     const payload = await response.json();
-    indicator.innerHTML = '<span class="status-dot ready"></span> API ' + escapeHtml(payload.status);
+    indicator.innerHTML =
+      '<span class="status-dot ready"></span> API ' +
+      escapeHtml(payload.status);
   } catch {
     indicator.innerHTML = '<span class="status-dot"></span> API unavailable';
   }
 }
 
+async function initOpsMetrics() {
+  const target = document.querySelector("[data-ops-metrics]");
+  if (!target) return;
+
+  try {
+    const response = await fetch("/v1/metrics/summary");
+    if (!response.ok) throw new Error("metrics unavailable");
+    const payload = await response.json();
+    target.innerHTML = `
+      <article class="metric-card is-visible">
+        <strong>${escapeHtml(payload.requests_total)}</strong>
+        <span>requests observed</span>
+      </article>
+      <article class="metric-card is-visible">
+        <strong>${escapeHtml(payload.qps)}</strong>
+        <span>average QPS</span>
+      </article>
+      <article class="metric-card is-visible">
+        <strong>${escapeHtml(payload.availability.success_percentage)}%</strong>
+        <span>availability</span>
+      </article>
+    `;
+  } catch {
+    target.innerHTML = `
+      <div class="result-error">
+        <h3>Metrics unavailable</h3>
+        <p>The API did not return runtime metrics yet. Check /readyz and server logs.</p>
+      </div>
+    `;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-audit-form]").forEach(initAuditForm);
+  document.querySelectorAll("[data-batch-form]").forEach(initBatchForm);
   initRevealAnimations();
   initHealthIndicator();
+  initOpsMetrics();
 });

@@ -3,11 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from email.utils import parseaddr
-import re
 
 import dns.exception
 import dns.resolver
-import httpx
 
 from inboxready_api.models import (
     AuditCheck,
@@ -16,6 +14,7 @@ from inboxready_api.models import (
     ProviderMatch,
     Recommendation,
 )
+from inboxready_api.domain_validation import normalize_domain
 from inboxready_api.services.provider_detection import detect_providers
 from inboxready_api.settings import Settings
 
@@ -84,15 +83,6 @@ def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAudit
         recommendations=dedupe_recommendations(recommendations),
         references=[DMARC_REFERENCE, GOOGLE_REFERENCE, YAHOO_REFERENCE],
     )
-
-
-def normalize_domain(value: str) -> str:
-    domain = value.strip().lower()
-    domain = re.sub(r"^https?://", "", domain)
-    domain = domain.strip("/")
-    if "/" in domain:
-        domain = domain.split("/", maxsplit=1)[0]
-    return domain
 
 
 def query_records(
@@ -316,6 +306,8 @@ def build_mta_sts_check(domain: str, records: list[str], settings: Settings) -> 
     details["policy_url"] = policy_url
 
     try:
+        import httpx
+
         with httpx.Client(
             timeout=settings.http_timeout_seconds,
             headers={"User-Agent": settings.user_agent},

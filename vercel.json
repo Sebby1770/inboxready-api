@@ -1,0 +1,40 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "builds": [
+    {
+      "src": "API/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "functions": {
+    "API/index.py": {
+      "maxDuration": 30,
+      "excludeFiles": "{API/tests/**,API/.pytest_cache/**,API/.venv/**,API/var/**,var/**,infra/**,**/__pycache__/**,**/*.pyc}"
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/API/index.py"
+    }
+  ]
+}

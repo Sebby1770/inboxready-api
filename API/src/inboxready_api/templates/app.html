@@ -1,73 +1,155 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="section workspace-hero">
-    <div class="section-heading compact" data-reveal>
-      <p class="section-kicker">Workspace</p>
-      <h1>Audit a domain, review the recommendations, and inspect the raw JSON in one place.</h1>
-      <p>
-        This is the operator-facing surface for the same API that powers the landing page.
-        It is useful for demos, support, internal ops, and design-partner onboarding.
-      </p>
+<section class="section workspace-hero">
+  <div class="section-heading compact" data-reveal>
+    <p class="section-kicker">Workspace</p>
+    <h1>
+      Audit a domain, review the recommendations, and inspect the raw JSON in
+      one place.
+    </h1>
+    <p>
+      This is the operator-facing surface for the same API that powers the
+      landing page. It is useful for demos, support, internal ops, and
+      design-partner onboarding.
+    </p>
+  </div>
+</section>
+
+<section class="section workspace-layout">
+  <aside class="workspace-sidebar panel" data-reveal>
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Run audit</p>
+        <h2>Domain input</h2>
+      </div>
+      <span class="panel-badge">Live API</span>
     </div>
+
+    <form
+      class="audit-form stacked"
+      data-audit-form
+      data-results-target="workspace-results"
+      data-recent-target="workspace-recents"
+    >
+      <label>
+        Root domain
+        <input
+          name="domain"
+          type="text"
+          placeholder="customer-example.com"
+          value="example.com"
+          required
+        />
+      </label>
+      <label>
+        DKIM selectors
+        <input
+          name="selectors"
+          type="text"
+          placeholder="google, selector1, s1"
+        />
+      </label>
+      <label>
+        Expected providers
+        <input
+          name="expected_providers"
+          type="text"
+          placeholder="Google Workspace, SendGrid"
+        />
+      </label>
+      <button type="submit" class="button full-width">Run Domain Audit</button>
+    </form>
+
+    <div class="sidebar-block">
+      <p class="sidebar-title">Recently tested</p>
+      <div class="recent-domains" id="workspace-recents"></div>
+    </div>
+
+    <div class="sidebar-block helper-card">
+      <p class="sidebar-title">Good first test cases</p>
+      <ul class="card-points">
+        <li>Try a customer domain you control.</li>
+        <li>Add likely selectors if the provider uses DKIM CNAMEs.</li>
+        <li>Use expected providers to catch misconfigured routing faster.</li>
+      </ul>
+    </div>
+  </aside>
+
+  <section class="workspace-main panel" data-reveal>
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Results</p>
+        <h2>Readiness report</h2>
+      </div>
+      <a class="button button-secondary" href="/docs">Open API Schema</a>
+    </div>
+
+    <div class="result-shell tall" id="workspace-results"></div>
   </section>
+</section>
 
-  <section class="section workspace-layout">
-    <aside class="workspace-sidebar panel" data-reveal>
+<section class="section account-section" id="account">
+  <div class="section-heading compact" data-reveal>
+    <p class="section-kicker">Product access</p>
+    <h2>Move from the public checker into the real account experience.</h2>
+    <p>
+      The public checker is for quick evaluation. The dashboard gives you
+      persistent usage, API key lifecycle controls, audit history, and billing
+      entry points.
+    </p>
+  </div>
+
+  <div class="account-grid">
+    <section class="panel account-form" data-reveal>
       <div class="panel-header">
         <div>
-          <p class="panel-label">Run audit</p>
-          <h2>Domain input</h2>
+          <p class="panel-label">Start</p>
+          <h2>Create your account</h2>
         </div>
-        <span class="panel-badge">Live API</span>
+        <span class="panel-badge">Dashboard</span>
       </div>
-
-      <form
-        class="audit-form stacked"
-        data-audit-form
-        data-results-target="workspace-results"
-        data-recent-target="workspace-recents"
-      >
-        <label>
-          Root domain
-          <input name="domain" type="text" placeholder="customer-example.com" value="example.com" required>
-        </label>
-        <label>
-          DKIM selectors
-          <input name="selectors" type="text" placeholder="google, selector1, s1">
-        </label>
-        <label>
-          Expected providers
-          <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
-        </label>
-        <button type="submit" class="button full-width">Run Domain Audit</button>
-      </form>
-
-      <div class="sidebar-block">
-        <p class="sidebar-title">Recently tested</p>
-        <div class="recent-domains" id="workspace-recents"></div>
+      <p>
+        Start on the free plan, generate your first API key, and use the
+        dashboard to review usage before you wire billing and live traffic.
+      </p>
+      <ul class="card-points">
+        <li>100 audits each month on the free launch tier</li>
+        <li>Batch audits, API key management, and usage tracking</li>
+        <li>Upgrade to paid tiers when Stripe is configured</li>
+      </ul>
+      <div class="stacked-actions">
+        {% if current_account %}
+        <a class="button full-width" href="/dashboard">Open Dashboard</a>
+        {% else %}
+        <a class="button full-width" href="/signup">Create Free Account</a>
+        <a class="button button-secondary full-width" href="/login">Sign In</a>
+        {% endif %}
       </div>
-
-      <div class="sidebar-block helper-card">
-        <p class="sidebar-title">Good first test cases</p>
-        <ul class="card-points">
-          <li>Try a customer domain you control.</li>
-          <li>Add likely selectors if the provider uses DKIM CNAMEs.</li>
-          <li>Use expected providers to catch misconfigured routing faster.</li>
-        </ul>
-      </div>
-    </aside>
-
-    <section class="workspace-main panel" data-reveal>
-      <div class="panel-header">
-        <div>
-          <p class="panel-label">Results</p>
-          <h2>Readiness report</h2>
-        </div>
-        <a class="button button-secondary" href="/docs">Open API Schema</a>
-      </div>
-
-      <div class="result-shell tall" id="workspace-results"></div>
     </section>
-  </section>
+
+    <section class="panel account-output" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">What you get</p>
+          <h2>Launch-ready account layer</h2>
+        </div>
+      </div>
+      <ul class="card-points">
+        <li>One-time API key reveal when you create or rotate credentials</li>
+        <li>
+          Recent audit history tied to your account instead of local browser
+          memory
+        </li>
+        <li>
+          Billing upgrade and portal entry points when Stripe env vars are
+          configured
+        </li>
+        <li>
+          Support intake and legal pages so the site feels like a real product
+        </li>
+      </ul>
+    </section>
+  </div>
+</section>
 {% endblock %}

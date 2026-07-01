@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section ops-hero">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Operations</p>
+    <h2>Production readiness without adding cloud theater.</h2>
+    <p>
+      InboxReady now has the operational surfaces an API buyer expects: staging,
+      metrics, request IDs, deploy manifests, CI/CD, health checks, queue-backed
+      audits, object exports, RPC, Vercel previews, and a clear storage-scaling path.
+    </p>
+  </div>
+
+  <div class="ops-live-grid">
+    <article class="panel ops-live-panel" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Live service pulse</p>
+          <h3>Current runtime signals</h3>
+        </div>
+        <span class="panel-badge">/v1/metrics/summary</span>
+      </div>
+      <div class="stats-grid" data-ops-metrics>
+        <article class="metric-card is-visible">
+          <strong>...</strong>
+          <span>requests</span>
+        </article>
+        <article class="metric-card is-visible">
+          <strong>...</strong>
+          <span>QPS</span>
+        </article>
+        <article class="metric-card is-visible">
+          <strong>...</strong>
+          <span>availability</span>
+        </article>
+      </div>
+      <p class="ops-note">
+        These counters reset on process restart, which is fine for MVP operations.
+        Persist them later with Prometheus, Grafana, Datadog, or your cloud provider.
+      </p>
+    </article>
+
+    <article class="panel ops-command-panel" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Launch commands</p>
+          <h3>Run the staging stack</h3>
+        </div>
+      </div>
+      <pre><code>docker compose up --build
+curl http://127.0.0.1:8080/readyz
+curl http://127.0.0.1:8080/metrics</code></pre>
+      <div class="panel-actions">
+        <a class="button button-secondary" href="/metrics">View Metrics</a>
+        <a class="button" href="/docs">Open API Docs</a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-heading" data-reveal>
+    <p class="section-kicker">Checklist</p>
+    <h2>What is implemented now versus intentionally deferred.</h2>
+    <p>
+      The product stays lean by shipping the operations primitives we need today
+      while keeping heavier cloud providers as adapters instead of day-one
+      maintenance commitments.
+    </p>
+  </div>
+
+  <div class="ops-grid">
+    {% for capability in ops_capabilities %}
+    <article class="panel ops-card" data-reveal>
+      <span class="panel-badge">{{ capability.status }}</span>
+      <h3>{{ capability.name }}</h3>
+      <p>{{ capability.detail }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="panel ops-matrix-panel" data-reveal>
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Scaling notes</p>
+        <h3>The honest path from solo-founder MVP to larger SaaS</h3>
+      </div>
+    </div>
+    <div class="history-table ops-table">
+      <div class="history-row history-head">
+        <span>Layer</span>
+        <span>Now</span>
+        <span>Later</span>
+      </div>
+      <div class="history-row">
+        <span>Database</span>
+        <span>Embedded SQLite for launch speed</span>
+        <span>Postgres or DynamoDB before multi-replica writes</span>
+      </div>
+      <div class="history-row">
+        <span>Jobs</span>
+        <span>Persisted audit jobs plus due-monitor execution</span>
+        <span>SQS, RabbitMQ, Kafka, or Lambda workers when volume justifies it</span>
+      </div>
+      <div class="history-row">
+        <span>Exports</span>
+        <span>JSON/CSV export objects in local object storage</span>
+        <span>S3 archives, signed URLs, and customer report delivery</span>
+      </div>
+      <div class="history-row">
+        <span>Integration style</span>
+        <span>REST, OpenAPI, RPC, WebSockets, and polling</span>
+        <span>SDKs, webhooks, and event-stream consumers</span>
+      </div>
+      <div class="history-row">
+        <span>Traffic</span>
+        <span>Nginx proxy and app usage limits</span>
+        <span>Kubernetes HPA, WAF rules, and edge caching</span>
+      </div>
+      <div class="history-row">
+        <span>Deployment</span>
+        <span>Render, Docker, Kubernetes, and Vercel paths</span>
+        <span>Preview promotion, managed storage, and custom domains</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
