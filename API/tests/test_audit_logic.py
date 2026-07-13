@@ -908,3 +908,34 @@ def test_dashboard_batch_audit_uses_session(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["summary"]["average_score"] == 91.0
+
+
+def test_robots_txt_served():
+    response = client.get("/robots.txt")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    body = response.text
+    assert "User-agent: *" in body
+    assert "Sitemap:" in body
+    assert "/sitemap.xml" in body
+
+
+def test_sitemap_xml_lists_public_pages():
+    response = client.get("/sitemap.xml")
+    assert response.status_code == 200
+    assert "xml" in response.headers["content-type"]
+    body = response.text
+    assert "<urlset" in body
+    assert "<loc>" in body
+    # Home and the free workspace should be discoverable.
+    assert "/app</loc>" in body
+
+
+def test_home_has_social_and_canonical_meta():
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert 'property="og:title"' in html
+    assert 'name="twitter:card"' in html
+    assert 'rel="canonical"' in html
+    assert 'application/ld+json' in html

@@ -579,6 +579,8 @@ def render_page(
         "flash": pop_flash(request),
         "support_email": settings.support_email,
         "company_name": settings.company_name,
+        "public_base_url": settings.public_base_url.rstrip("/"),
+        "canonical_url": str(request.url).split("?", 1)[0],
         "billing_enabled": bool(settings.stripe_secret_key),
         "public_signup_enabled": settings.public_signup_enabled,
     }
@@ -1048,6 +1050,53 @@ def terms_page(request: Request) -> HTMLResponse:
             "legal_effective_date": LEGAL_EFFECTIVE_DATE,
         },
     )
+
+
+SITEMAP_PATHS = [
+    ("/", "1.0"),
+    ("/app", "0.9"),
+    ("/docs", "0.7"),
+    ("/ops", "0.5"),
+    ("/support", "0.5"),
+    ("/changelog", "0.4"),
+    ("/privacy", "0.3"),
+    ("/terms", "0.3"),
+]
+
+
+@app.get("/robots.txt", response_class=Response, response_model=None)
+def robots_txt() -> Response:
+    base = get_settings().public_base_url.rstrip("/")
+    body = "\n".join(
+        [
+            "User-agent: *",
+            "Allow: /",
+            # Keep authenticated/operational surfaces out of the index.
+            "Disallow: /dashboard",
+            "Disallow: /api",
+            "Disallow: /healthz",
+            "Disallow: /readyz",
+            "Disallow: /metrics",
+            f"Sitemap: {base}/sitemap.xml",
+            "",
+        ]
+    )
+    return Response(content=body, media_type="text/plain; charset=utf-8")
+
+
+@app.get("/sitemap.xml", response_class=Response, response_model=None)
+def sitemap_xml() -> Response:
+    base = get_settings().public_base_url.rstrip("/")
+    urls = "".join(
+        f"<url><loc>{base}{path}</loc><priority>{priority}</priority></url>"
+        for path, priority in SITEMAP_PATHS
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return Response(content=body, media_type="application/xml; charset=utf-8")
 
 
 @app.get("/dashboard/audit-history.csv", response_class=Response, response_model=None)
