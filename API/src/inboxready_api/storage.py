@@ -243,6 +243,12 @@ class Storage:
                   created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS stripe_events (
+                  id TEXT PRIMARY KEY,
+                  event_type TEXT NOT NULL,
+                  processed_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS audit_logs_account_created_idx
                   ON audit_logs(account_id, created_at);
                 CREATE INDEX IF NOT EXISTS rate_events_identifier_created_idx
@@ -448,6 +454,36 @@ class Storage:
                 (str(uuid.uuid4()), identifier, units, utc_now()),
             )
             conn.execute("DELETE FROM rate_events WHERE created_at < datetime('now', '-2 days')")
+
+    def mark_stripe_event_processed(self, *, event_id: str, event_type: str) -> bool:
+        """Record a Stripe event id; return True only the first time it is seen.
+
+        Stripe guarantees at-least-once webhook delivery and retries on any
+        non-2xx, so the same event id can arrive several times. Callers use the
+        return value to make webhook handling idempotent: apply side effects only
+        when this returns True.
+        """
+
+        self.init_schema()
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "INSERT OR IGNORE INTO stripe_events (id, event_type, processed_at) "
+                "VALUES (?, ?, ?)",
+                (event_id, event_type, utc_now()),
+            )
+            return cursor.rowcount > 0
+
+    def delete_stripe_event(self, *, event_id: str) -> None:
+        """Undo mark_stripe_event_processed so a failed handler can be retried.
+
+        If handling an event raises, we remove its idempotency record; Stripe
+        then redelivers and the event is reprocessed instead of skipped as a
+        duplicate.
+        """
+
+        self.init_schema()
+        with self.connect() as conn:
+            conn.execute("DELETE FROM stripe_events WHERE id = ?", (event_id,))
 
     def log_audit(
         self,

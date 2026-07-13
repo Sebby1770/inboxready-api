@@ -279,6 +279,22 @@ protected by a per-session CSRF token, authentication rotates session contents, 
 hashes fail closed, and responses include CSP, frame, MIME-sniffing, referrer, and permissions
 headers. Set `INBOXREADY_SESSION_HTTPS_ONLY=true` behind HTTPS to enable secure cookies and HSTS.
 
+### Security & secrets
+
+- **Nothing sensitive is committed.** Secrets live only in environment variables; `.env` is gitignored
+  (only `.env.example` is tracked). Set `INBOXREADY_ENVIRONMENT=production` in production and the app
+  **refuses to boot** unless the session secret is non-default, cookies are Secure, the public URL is
+  `https://`, and the SSRF guard is on — a loud failure beats a silently forgeable session.
+- **API keys are never recoverable.** They are stored only as SHA-256 hashes plus a short non-secret
+  prefix and shown exactly once at creation; rotate any leaked key from the dashboard.
+- **SSRF-hardened.** MTA-STS policy files are fetched from customer-controlled hostnames, so the fetch
+  goes through `services/safe_http.py`, which refuses to connect to any private, loopback, link-local
+  (incl. `169.254.169.254` cloud metadata), or reserved address and re-validates every redirect hop.
+- **Billing is replay-safe.** Stripe webhook signatures are verified and every event id is recorded, so
+  at-least-once redelivery can never double-apply a plan change.
+- Rotate `INBOXREADY_SESSION_SECRET` if it leaks (invalidates all sessions). Generate one with
+  `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+
 Usage is counted by audit unit. A single-domain audit costs 1 unit; a batch audit costs one
 unit per normalized domain. Current launch limits are:
 

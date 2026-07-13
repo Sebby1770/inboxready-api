@@ -129,6 +129,11 @@ CSV_FIELDNAMES = [
     "created_at",
 ]
 
+# Fail closed at import time if production is misconfigured (default session
+# secret, non-Secure cookies, http public URL, SSRF guard disabled). Better a
+# loud crash on deploy than a silently forgeable session in production.
+get_settings().validate_production_safety()
+
 app = FastAPI(
     title="InboxReady API",
     version=__version__,
@@ -1014,14 +1019,20 @@ def ops_page(request: Request) -> HTMLResponse:
     )
 
 
+LEGAL_EFFECTIVE_DATE = "12 July 2026"
+
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request) -> HTMLResponse:
     return render_page(
         request,
         name="legal.html",
         page_title="Privacy Policy",
-        page_description="InboxReady privacy policy placeholder for launch and design-partner use.",
-        extra_context={"legal_mode": "privacy"},
+        page_description="How InboxReady collects, uses, retains, and deletes your data.",
+        extra_context={
+            "legal_mode": "privacy",
+            "legal_effective_date": LEGAL_EFFECTIVE_DATE,
+        },
     )
 
 
@@ -1031,8 +1042,11 @@ def terms_page(request: Request) -> HTMLResponse:
         request,
         name="legal.html",
         page_title="Terms of Service",
-        page_description="InboxReady terms of service placeholder for launch and design-partner use.",
-        extra_context={"legal_mode": "terms"},
+        page_description="The terms governing your use of the InboxReady email domain audit service.",
+        extra_context={
+            "legal_mode": "terms",
+            "legal_effective_date": LEGAL_EFFECTIVE_DATE,
+        },
     )
 
 
