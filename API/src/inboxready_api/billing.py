@@ -162,12 +162,33 @@ def handle_stripe_webhook(
     )
     event = json.loads(payload)
     event_type = event.get("type")
+    event_id = event.get("id")
     obj = event.get("data", {}).get("object", {})
 
-    if event_type == "checkout.session.completed":
-        handle_checkout_completed(settings, storage, obj)
-    elif event_type in {"customer.subscription.updated", "customer.subscription.deleted"}:
-        handle_subscription_change(settings, storage, obj, deleted=event_type.endswith("deleted"))
+    # Idempotency: Stripe delivers at-least-once and retries on non-2xx, so the
+    # same event id can arrive repeatedly. Record it first and no-op on replays
+    # to avoid double-applying billing state changes.
+    recorded_event_id: str | None = None
+    if isinstance(event_id, str) and event_id:
+        first_time = storage.mark_stripe_event_processed(
+            event_id=event_id, event_type=str(event_type or "unknown")
+        )
+        if not first_time:
+            return {"received": "true", "duplicate": "true"}
+        recorded_event_id = event_id
+
+    # If handling fails, roll back the idempotency record so Stripe's retry is
+    # reprocessed rather than skipped as a duplicate — a transient error must
+    # not permanently drop a paid upgrade.
+    try:
+        if event_type == "checkout.session.completed":
+            handle_checkout_completed(settings, storage, obj)
+        elif event_type in {"customer.subscription.updated", "customer.subscription.deleted"}:
+            handle_subscription_change(settings, storage, obj, deleted=event_type.endswith("deleted"))
+    except Exception:
+        if recorded_event_id is not None:
+            storage.delete_stripe_event(event_id=recorded_event_id)
+        raise
 
     return {"received": "true"}
 

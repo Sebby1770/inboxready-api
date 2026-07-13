@@ -6,6 +6,7 @@ from email.utils import parseaddr
 
 import dns.exception
 import dns.resolver
+import httpx
 
 from inboxready_api.models import (
     AuditCheck,
@@ -16,6 +17,7 @@ from inboxready_api.models import (
 )
 from inboxready_api.domain_validation import normalize_domain
 from inboxready_api.services.provider_detection import detect_providers
+from inboxready_api.services.safe_http import UnsafeRequestError, safe_get
 from inboxready_api.settings import Settings
 
 DMARC_REFERENCE = "https://dmarc.org/"
@@ -305,24 +307,27 @@ def build_mta_sts_check(domain: str, records: list[str], settings: Settings) -> 
     policy_url = f"https://mta-sts.{domain}/.well-known/mta-sts.txt"
     details["policy_url"] = policy_url
 
+    # The policy host is derived from customer-supplied domain input, so this
+    # fetch is SSRF-sensitive. safe_get refuses to connect to any non-public
+    # address and re-validates every redirect hop. See services/safe_http.py.
     try:
-        import httpx
-
-        with httpx.Client(
+        response = safe_get(
+            policy_url,
             timeout=settings.http_timeout_seconds,
-            headers={"User-Agent": settings.user_agent},
-            follow_redirects=True,
-        ) as client:
-            response = client.get(policy_url)
-            if response.status_code == 200:
-                policy = parse_mta_sts_policy(response.text)
-                details["policy"] = policy
-                status = "pass" if policy.get("mode") == "enforce" else "warn"
-                summary = "MTA-STS record and policy file found."
-                if status == "warn":
-                    summary = "MTA-STS exists but is not in enforce mode."
-                return AuditCheck(status=status, summary=summary, details=details)
-            details["policy_fetch_status"] = response.status_code
+            user_agent=settings.user_agent,
+            allow_private_networks=settings.allow_private_network_fetches,
+        )
+        if response.status_code == 200:
+            policy = parse_mta_sts_policy(response.text)
+            details["policy"] = policy
+            status = "pass" if policy.get("mode") == "enforce" else "warn"
+            summary = "MTA-STS record and policy file found."
+            if status == "warn":
+                summary = "MTA-STS exists but is not in enforce mode."
+            return AuditCheck(status=status, summary=summary, details=details)
+        details["policy_fetch_status"] = response.status_code
+    except UnsafeRequestError as exc:
+        details["policy_fetch_error"] = f"blocked unsafe fetch: {exc}"
     except httpx.HTTPError as exc:
         details["policy_fetch_error"] = str(exc)
 
