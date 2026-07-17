@@ -16,6 +16,7 @@ from inboxready_api.models import (
     ProviderMatch,
     Recommendation,
 )
+from inboxready_api.services.free_email import free_email_warning_message, is_free_email_domain
 from inboxready_api.services.provider_detection import detect_providers
 from inboxready_api.settings import Settings
 
@@ -71,6 +72,25 @@ def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAudit
     recommendations.extend(recommendations_for_check("bimi", bimi_check))
 
     providers = append_expected_provider_warnings(providers, request.expected_providers, recommendations)
+
+    if is_free_email_domain(domain):
+        checks["sending_domain"] = AuditCheck(
+            status="warn",
+            summary=free_email_warning_message(domain),
+            details={"free_or_disposable": True},
+        )
+        recommendations.append(
+            Recommendation(
+                severity="medium",
+                code="free-email-domain",
+                message=free_email_warning_message(domain),
+                details=(
+                    "Use a domain you own for transactional or bulk sending. "
+                    "Free mailbox providers cannot be customized for SPF/DKIM as a brand domain."
+                ),
+            )
+        )
+
     score = score_checks(checks)
     overall_status = derive_overall_status(checks)
 
@@ -444,10 +464,12 @@ def score_checks(checks: dict[str, AuditCheck]) -> int:
         "fail": 0.0,
     }
 
-    total_weight = sum(weights.values())
+    # Only score core auth checks so optional advisories (e.g. free-email) don't distort totals.
+    scored_keys = [key for key in weights if key in checks]
+    total_weight = sum(weights[key] for key in scored_keys) or 1
     earned = 0.0
-    for key, weight in weights.items():
-        earned += weight * status_scores[checks[key].status]
+    for key in scored_keys:
+        earned += weights[key] * status_scores[checks[key].status]
     return int(round((earned / total_weight) * 100))
 
 

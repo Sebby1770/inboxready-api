@@ -1,12 +1,8 @@
 # InboxReady API
 
-InboxReady is a practical API-as-a-Service MVP for one sticky B2B problem: verifying whether a customer domain is actually ready to send trustworthy email.
+InboxReady is a practical API-as-a-Service for verifying whether a customer domain is ready to send trustworthy email.
 
-This folder includes:
-
-- A founder-grade idea brief with six API businesses in [ideas.md](./ideas.md)
-- A concrete launch checklist in [launch-plan.md](./launch-plan.md)
-- A runnable FastAPI MVP for the strongest idea: `InboxReady API`
+**Version:** 0.2.0
 
 ## Why This Idea
 
@@ -19,30 +15,43 @@ SaaS products that send email on behalf of customers keep hitting the same opera
 
 InboxReady turns that into one API call.
 
-## MVP Features
+## Features
 
 - Polished SaaS landing page at `/`
 - Interactive audit workspace at `/app`
 - Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
 - Detects likely sending providers from DNS evidence
-- Scores domain readiness from 0-100
-- Returns structured findings plus actionable remediation guidance
-- Exposes a clean REST API with OpenAPI docs out of the box
+- Scores domain readiness from 0–100
+- Structured findings + actionable remediation guidance
+- Optional API keys (`X-API-Key`) and rate limiting
+- TTL audit response cache (`X-Cache: HIT|MISS`)
+- Markdown reports (`?format=markdown` or `/v1/audit/{domain}/report.md`)
+- Domain compare (`POST /v1/compare`)
+- Concurrent batch audits (up to 25 domains)
+- Free / disposable mailbox domain warnings
+- `/healthz` and `/readyz` with version
+- CLI with formats, `--out`, `--timeout`, exit codes
 
 ## Endpoints
 
-- `GET /`
-- `GET /app`
-- `GET /api`
-- `GET /healthz`
-- `GET /v1/providers`
-- `POST /v1/audits/email-domain`
-- `POST /v1/audits/batch`
+| Method | Path |
+| --- | --- |
+| `GET` | `/` |
+| `GET` | `/app` |
+| `GET` | `/api` |
+| `GET` | `/healthz` |
+| `GET` | `/readyz` |
+| `GET` | `/v1/providers` |
+| `POST` | `/v1/audits/email-domain` |
+| `GET` | `/v1/audit/{domain}/report.md` |
+| `POST` | `/v1/audits/batch` |
+| `POST` | `/v1/compare` |
+| `POST` | `/v1/cache/clear` |
 
 ## Quick Start
 
 ```bash
-cd /Users/sebastianforbes/Desktop/CODE/API-as-a-Service/API
+cd API
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
@@ -51,10 +60,24 @@ uvicorn --app-dir src inboxready_api.main:app --reload
 
 Open:
 
-- Website: [http://127.0.0.1:8000](http://127.0.0.1:8000)
-- Workspace: [http://127.0.0.1:8000/app](http://127.0.0.1:8000/app)
-- API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- Health check: [http://127.0.0.1:8000/healthz](http://127.0.0.1:8000/healthz)
+- Website: http://127.0.0.1:8000
+- Workspace: http://127.0.0.1:8000/app
+- API docs: http://127.0.0.1:8000/docs
+- Health: http://127.0.0.1:8000/healthz
+- Ready: http://127.0.0.1:8000/readyz
+
+## Environment
+
+See [`.env.example`](./.env.example). Important production knobs:
+
+```bash
+INBOXREADY_API_KEYS=key1,key2
+INBOXREADY_REQUIRE_API_KEY=false
+INBOXREADY_RATE_LIMIT_PER_MINUTE=60
+INBOXREADY_CACHE_TTL_SECONDS=300
+```
+
+When `INBOXREADY_API_KEYS` is non-empty (or `REQUIRE_API_KEY=true`), send `X-API-Key` on `/v1/*` routes. Missing/invalid keys return **401**; over-limit clients return **429**.
 
 ## Example Request
 
@@ -67,9 +90,17 @@ curl -X POST http://127.0.0.1:8000/v1/audits/email-domain \
   }'
 ```
 
+Markdown:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/audits/email-domain?format=markdown" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"example.com"}'
+```
+
 ## Batch Audits
 
-Audit up to 10 customer domains in one request and get a portfolio-level summary:
+Audit up to **25** domains concurrently:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/audits/batch \
@@ -81,18 +112,26 @@ curl -X POST http://127.0.0.1:8000/v1/audits/batch \
   }'
 ```
 
-The response includes every domain audit plus `summary.average_score`,
-`summary.status_counts`, and the top repeated remediation patterns.
+## Compare
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/compare \
+  -H "Content-Type: application/json" \
+  -d '{"domains":["example.com","openai.com"]}'
+```
 
 ## CLI
 
-The package also installs a small Python CLI:
-
 ```bash
+inboxready version
 inboxready providers
 inboxready audit example.com --selectors google,selector1
+inboxready audit example.com --format md --out report.md
 inboxready audit example.com openai.com --json
+inboxready compare example.com openai.com
 ```
+
+Exit codes: **0** pass, **1** fail overall, **2** error.
 
 ## Example Response Shape
 
@@ -127,47 +166,25 @@ inboxready audit example.com openai.com --json
 }
 ```
 
-## Product Positioning
+## Deploy Notes
 
-Initial positioning:
-
-- API-first, not consultant-first
-- onboarding and remediation, not full DMARC analytics
-- white-label friendly for SaaS products and agencies
-- low-friction pricing for startups that cannot justify enterprise security tooling
-
-## Suggested Commercial Packaging
-
-- Free: 100 audits/month, community docs only
-- Starter: $49/month for 2,500 audits
-- Growth: $149/month for 15,000 audits + webhooks + batch jobs
-- Pro: $399/month for 75,000 audits + team accounts + SLA
-- Overage: $0.01-$0.03 per audit depending on tier
+- Cache and rate limits are in-memory per process.
+- Point load balancer liveness at `/healthz` and readiness at `/readyz`.
+- Set API keys before exposing a public production instance.
 
 ## Local Development Note
 
-The app source lives under `src/`, so local dev should use Uvicorn's `--app-dir src` flag:
-
 ```bash
 uvicorn --app-dir src inboxready_api.main:app --reload
+pytest -q
 ```
-
-## Next Features After MVP
-
-- Persistent audit history and trendlines
-- Webhooks for DNS changes and policy regressions
-- Branded setup guides per provider
-- Team workspaces and API keys
-- Batch audits for MSPs and ESPs
-- Hosted DNS verification widgets for customer onboarding flows
 
 ## Files
 
 - App entrypoint: [src/inboxready_api/main.py](./src/inboxready_api/main.py)
-- Website copy/config: [src/inboxready_api/site_content.py](./src/inboxready_api/site_content.py)
+- Settings: [src/inboxready_api/settings.py](./src/inboxready_api/settings.py)
+- Auth / rate limit: [src/inboxready_api/security.py](./src/inboxready_api/security.py)
+- Cache: [src/inboxready_api/cache.py](./src/inboxready_api/cache.py)
 - Audit engine: [src/inboxready_api/services/dns_audit.py](./src/inboxready_api/services/dns_audit.py)
-- Provider heuristics: [src/inboxready_api/services/provider_detection.py](./src/inboxready_api/services/provider_detection.py)
-- Templates: [src/inboxready_api/templates/base.html](./src/inboxready_api/templates/base.html)
-- Frontend assets: [src/inboxready_api/static/css/site.css](./src/inboxready_api/static/css/site.css), [src/inboxready_api/static/js/app.js](./src/inboxready_api/static/js/app.js)
-- Founder brief: [ideas.md](./ideas.md)
-- Launch steps: [launch-plan.md](./launch-plan.md)
+- Batch / compare / report: [src/inboxready_api/services/](./src/inboxready_api/services/)
+- CLI: [src/inboxready_api/cli.py](./src/inboxready_api/cli.py)

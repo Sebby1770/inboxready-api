@@ -1,10 +1,19 @@
+from __future__ import annotations
+
 from inboxready_api.services.dns_audit import (
     build_bimi_check,
+    normalize_domain,
     parse_mta_sts_policy,
     parse_semicolon_tags,
     parse_spf_record,
+    score_checks,
 )
-from inboxready_api.models import AuditCheck, BatchAuditRequest, DomainAuditResponse, Recommendation
+from inboxready_api.models import (
+    AuditCheck,
+    BatchAuditRequest,
+    DomainAuditResponse,
+    Recommendation,
+)
 from inboxready_api.main import app
 from inboxready_api.services.batch_audit import summarize_batch, unique_normalized_domains
 from inboxready_api.services.provider_detection import detect_providers
@@ -92,6 +101,12 @@ def test_unique_normalized_domains_keeps_first_seen_order() -> None:
     assert domains == ["example.com", "api.example.com"]
 
 
+def test_normalize_domain_strips_scheme_path_and_case() -> None:
+    assert normalize_domain("HTTPS://Mail.Example.COM/path?q=1") == "mail.example.com"
+    assert normalize_domain("  example.com. ") == "example.com."
+    assert normalize_domain("example.com") == "example.com"
+
+
 def test_batch_summary_prioritizes_repeated_high_severity_recommendations() -> None:
     audits = [
         DomainAuditResponse(
@@ -163,3 +178,17 @@ def test_batch_endpoint_accepts_multiple_domains(monkeypatch) -> None:
     assert payload["summary"]["domain_count"] == 2
     assert payload["summary"]["average_score"] == 90.0
     assert [audit["domain"] for audit in payload["audits"]] == ["example.com", "openai.com"]
+
+
+def test_score_checks_weights_core_auth_only() -> None:
+    checks = {
+        "mx": AuditCheck(status="pass", summary="ok"),
+        "spf": AuditCheck(status="pass", summary="ok"),
+        "dmarc": AuditCheck(status="pass", summary="ok"),
+        "dkim": AuditCheck(status="pass", summary="ok"),
+        "mta_sts": AuditCheck(status="info", summary="n/a"),
+        "tls_rpt": AuditCheck(status="info", summary="n/a"),
+        "bimi": AuditCheck(status="info", summary="n/a"),
+        "sending_domain": AuditCheck(status="warn", summary="free"),
+    }
+    assert score_checks(checks) == score_checks({k: v for k, v in checks.items() if k != "sending_domain"})

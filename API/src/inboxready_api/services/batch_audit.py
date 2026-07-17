@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from inboxready_api.models import (
     BatchAuditRequest,
@@ -23,8 +24,14 @@ SEVERITY_RANK = {
 
 def audit_domains(request: BatchAuditRequest, settings: Settings) -> BatchAuditResponse:
     domains = unique_normalized_domains(request.domains)
-    audits = [
-        audit_domain(
+    if not domains:
+        return BatchAuditResponse(
+            audits=[],
+            summary=summarize_batch([]),
+        )
+
+    def _audit_one(domain: str) -> DomainAuditResponse:
+        return audit_domain(
             DomainAuditRequest(
                 domain=domain,
                 selectors=request.selectors,
@@ -32,8 +39,18 @@ def audit_domains(request: BatchAuditRequest, settings: Settings) -> BatchAuditR
             ),
             settings,
         )
-        for domain in domains
-    ]
+
+    # Concurrent audits; reassemble in input order for deterministic summary.
+    max_workers = min(settings.batch_max_workers, len(domains))
+    results_by_domain: dict[str, DomainAuditResponse] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {executor.submit(_audit_one, domain): domain for domain in domains}
+        for future in as_completed(future_map):
+            domain = future_map[future]
+            results_by_domain[domain] = future.result()
+
+    audits = [results_by_domain[domain] for domain in domains]
 
     return BatchAuditResponse(
         audits=audits,
