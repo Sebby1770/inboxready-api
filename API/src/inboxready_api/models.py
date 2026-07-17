@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 Status = Literal["pass", "warn", "fail", "info"]
 Severity = Literal["low", "medium", "high"]
+ReportFormat = Literal["json", "markdown", "text"]
 
 
 class ProviderMatch(BaseModel):
@@ -62,7 +63,7 @@ class DomainAuditResponse(BaseModel):
 class BatchAuditRequest(BaseModel):
     domains: list[str] = Field(
         min_length=1,
-        max_length=10,
+        max_length=25,
         description="Root domains to inspect. Duplicate normalized domains are audited once.",
     )
     selectors: list[str] = Field(
@@ -89,3 +90,37 @@ class BatchAuditResponse(BaseModel):
 
 class ProviderCatalogResponse(BaseModel):
     providers: list[ProviderMatch]
+
+
+class CompareRequest(BaseModel):
+    domains: list[str] = Field(
+        min_length=2,
+        max_length=10,
+        description="Domains to compare side-by-side (2–10 unique after normalization).",
+    )
+    selectors: list[str] = Field(default_factory=list)
+    expected_providers: list[str] = Field(default_factory=list)
+
+
+class DomainScoreSummary(BaseModel):
+    domain: str
+    score: int = Field(ge=0, le=100)
+    overall_status: Status
+
+
+class CompareCheckDiff(BaseModel):
+    check: str
+    statuses: dict[str, str]
+    summaries: dict[str, str]
+    differs: bool
+
+
+class CompareResponse(BaseModel):
+    domains: list[DomainScoreSummary]
+    check_diffs: list[CompareCheckDiff]
+    audits: list[DomainAuditResponse] = Field(default_factory=list)
+
+
+class CacheClearResponse(BaseModel):
+    cleared: int
+    message: str
