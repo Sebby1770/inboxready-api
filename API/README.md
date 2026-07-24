@@ -2,7 +2,7 @@
 
 InboxReady is a practical API-as-a-Service for verifying whether a customer domain is ready to send trustworthy email.
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ## Why This Idea
 
@@ -46,6 +46,10 @@ InboxReady turns that into one API call.
 | `GET` | `/v1/audit/{domain}/report.md` |
 | `POST` | `/v1/audits/batch` |
 | `POST` | `/v1/compare` |
+| `GET` | `/v1/history` | Recent audits |
+| `GET` | `/v1/history/stats` | Aggregate history |
+| `GET` | `/v1/history/export.csv` | CSV export |
+| `GET` | `/v1/scoring` | Score weights |
 | `POST` | `/v1/cache/clear` |
 
 ## Quick Start

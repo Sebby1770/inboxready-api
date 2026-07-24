@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     http_timeout_seconds: float = 5.0
-    user_agent: str = "InboxReady/0.2 (+https://example.com)"
+    user_agent: str = "InboxReady/0.3 (+https://example.com)"
     api_keys: str = Field(
         default="",
         description="Comma-separated API keys. When set, X-API-Key is required.",
@@ -32,6 +32,26 @@ class Settings(BaseSettings):
         ge=1,
         le=32,
         description="Thread pool size for concurrent batch domain audits.",
+    )
+    history_max_entries: int = Field(
+        default=500,
+        ge=1,
+        le=10_000,
+        description="Max audit history entries retained in memory.",
+    )
+    history_path: str = Field(
+        default="",
+        description="Optional JSON file path for persisting audit history.",
+    )
+    webhook_url: str = Field(
+        default="",
+        description="Optional webhook URL notified when score is below threshold.",
+    )
+    webhook_min_score: int = Field(
+        default=70,
+        ge=0,
+        le=100,
+        description="Fire webhook when audit score is strictly below this value.",
     )
 
     model_config = SettingsConfigDict(
