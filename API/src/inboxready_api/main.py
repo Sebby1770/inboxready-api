@@ -25,7 +25,10 @@ from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dns_audit import audit_domain, normalize_domain
 from inboxready_api.services.provider_detection import get_provider_catalog
-from inboxready_api.services.report import render_markdown_report
+from inboxready_api.services.report import render_html_report, render_markdown_report
+from inboxready_api.services.history import configure_history, get_history
+from inboxready_api.services.scoring import scoring_document
+from inboxready_api.middleware import RequestIdMiddleware
 from inboxready_api.settings import get_settings
 from inboxready_api.site_content import (
     FAQS,
@@ -52,6 +55,16 @@ app = FastAPI(
     ),
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.add_middleware(RequestIdMiddleware)
+
+@app.on_event("startup")
+def _startup_history() -> None:
+    settings = get_settings()
+    configure_history(
+        max_entries=settings.history_max_entries,
+        path=settings.history_path or None,
+    )
+
 
 
 def build_template_context(request: Request, *, page_title: str, page_description: str) -> dict[str, object]:
@@ -158,15 +171,50 @@ def list_providers(_auth: str = Depends(require_api_access)) -> ProviderCatalogR
     return ProviderCatalogResponse(providers=get_provider_catalog())
 
 
+def _record_audit(result, cache_status: str) -> None:
+    get_history().add(
+        domain=result.domain,
+        score=result.score,
+        overall_status=result.overall_status,
+        checked_at=result.checked_at,
+        cached=cache_status == "HIT",
+    )
+    _maybe_webhook(result)
+
+
+def _maybe_webhook(result) -> None:
+    settings = get_settings()
+    if not settings.webhook_url:
+        return
+    if result.score >= settings.webhook_min_score:
+        return
+    try:
+        import httpx
+
+        httpx.post(
+            settings.webhook_url,
+            json={
+                "domain": result.domain,
+                "score": result.score,
+                "overall_status": result.overall_status,
+                "checked_at": result.checked_at,
+            },
+            timeout=2.0,
+        )
+    except Exception:
+        pass
+
+
 @app.post("/v1/audits/email-domain", response_model=None)
 def create_email_domain_audit(
     body: DomainAuditRequest,
     response: Response,
-    format: str = Query(default="json", pattern="^(json|markdown|md)$"),
+    format: str = Query(default="json", pattern="^(json|markdown|md|html)$"),
     _auth: str = Depends(require_api_access),
 ):
     result, cache_status = _run_cached_audit(body)
     response.headers["X-Cache"] = cache_status
+    _record_audit(result, cache_status)
 
     if format in {"markdown", "md"}:
         return PlainTextResponse(
@@ -174,7 +222,11 @@ def create_email_domain_audit(
             media_type="text/markdown; charset=utf-8",
             headers={"X-Cache": cache_status},
         )
-    # Explicit JSON so X-Cache is always present on the wire.
+    if format == "html":
+        return HTMLResponse(
+            content=render_html_report(result),
+            headers={"X-Cache": cache_status},
+        )
     return JSONResponse(
         content=result.model_dump(mode="json"),
         headers={"X-Cache": cache_status},
@@ -220,6 +272,34 @@ def create_domain_compare(
     _auth: str = Depends(require_api_access),
 ) -> CompareResponse:
     return compare_domains(body, get_settings())
+
+
+@app.get("/v1/scoring")
+def get_scoring_document(_auth: str = Depends(require_api_access)) -> dict:
+    return scoring_document()
+
+
+@app.get("/v1/history")
+def list_history(
+    domain: str | None = None,
+    limit: int = Query(default=20, ge=1, le=500),
+    _auth: str = Depends(require_api_access),
+) -> dict:
+    entries = get_history().list(domain=domain, limit=limit)
+    return {"count": len(entries), "entries": [e.to_dict() for e in entries]}
+
+
+@app.get("/v1/history/stats")
+def history_stats(_auth: str = Depends(require_api_access)) -> dict:
+    return get_history().stats()
+
+
+@app.get("/v1/history/export.csv")
+def history_export_csv(_auth: str = Depends(require_api_access)) -> PlainTextResponse:
+    return PlainTextResponse(
+        content=get_history().export_csv(),
+        media_type="text/csv; charset=utf-8",
+    )
 
 
 @app.post("/v1/cache/clear", response_model=CacheClearResponse)

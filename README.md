@@ -2,11 +2,11 @@
 
 InboxReady is a Python/FastAPI service that audits whether customer domains are ready to send trustworthy email.
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI; detects likely sending providers; returns a weighted readiness score and remediation guidance; and includes caching, optional API keys, rate limiting, domain compare, and markdown reports.
 
-## Features (v0.2)
+## Features (v0.3)
 
 - Single-domain and concurrent batch audits (up to 25 domains)
 - Provider fingerprint catalog
@@ -67,6 +67,10 @@ Copy [`API/.env.example`](./API/.env.example). All settings use the `INBOXREADY_
 | `GET` | `/v1/audit/{domain}/report.md` | Markdown report |
 | `POST` | `/v1/audits/batch` | Up to 25 domains, concurrent |
 | `POST` | `/v1/compare` | Side-by-side scores + check diffs |
+| `GET` | `/v1/history` | Recent audits |
+| `GET` | `/v1/history/stats` | Aggregate history |
+| `GET` | `/v1/history/export.csv` | CSV export |
+| `GET` | `/v1/scoring` | Score weights |
 | `POST` | `/v1/cache/clear` | Clear in-memory cache |
 
 Auth (when keys configured or `REQUIRE_API_KEY=true`):

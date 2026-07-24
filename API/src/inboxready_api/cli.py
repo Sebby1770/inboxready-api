@@ -11,7 +11,9 @@ from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dns_audit import audit_domain
 from inboxready_api.services.provider_detection import get_provider_catalog
-from inboxready_api.services.report import render_markdown_report
+from inboxready_api.services.report import render_html_report, render_markdown_report
+from inboxready_api.services.history import configure_history, get_history
+from inboxready_api.services.scoring import scoring_document
 from inboxready_api.settings import Settings, get_settings
 
 
@@ -36,6 +38,37 @@ def main(argv: list[str] | None = None) -> None:
 def run_command(args: argparse.Namespace) -> int:
     if args.command == "version":
         print(__version__)
+        return EXIT_PASS
+
+    if args.command == "history":
+        settings = resolve_settings(args)
+        configure_history(
+            max_entries=settings.history_max_entries,
+            path=settings.history_path or None,
+        )
+        store = get_history()
+        if getattr(args, "history_cmd", None) == "stats":
+            payload = store.stats()
+            output = json.dumps(payload, indent=2) if args.json else (
+                f"count={payload['count']} avg={payload['average_score']} "
+                f"domains={payload['unique_domains']} by_status={payload['by_status']}"
+            )
+        else:
+            entries = store.list(
+                domain=getattr(args, "domain", None),
+                limit=getattr(args, "limit", 20) or 20,
+            )
+            if args.json:
+                output = json.dumps([e.to_dict() for e in entries], indent=2)
+            else:
+                lines = [f"{e.checked_at}  {e.score:3d}  {e.overall_status:5}  {e.domain}" for e in entries]
+                output = "\n".join(lines) if lines else "(no history)"
+        write_output(output, getattr(args, "out", None))
+        return EXIT_PASS
+
+    if args.command == "scoring":
+        payload = scoring_document()
+        write_output(json.dumps(payload, indent=2), getattr(args, "out", None))
         return EXIT_PASS
 
     if args.command == "providers":
@@ -91,6 +124,8 @@ def run_command(args: argparse.Namespace) -> int:
                 output = result.model_dump_json(indent=2)
             elif fmt in {"md", "markdown"}:
                 output = render_markdown_report(result)
+            elif fmt == "html":
+                output = render_html_report(result)
             else:
                 output = format_domain_text(result)
             write_output(output, getattr(args, "out", None))
@@ -178,6 +213,19 @@ def build_parser() -> argparse.ArgumentParser:
     providers_parser.add_argument("--out", metavar="FILE", help="Write output to a file.")
 
     subparsers.add_parser("version", help="Print package version.")
+
+
+    hist = subparsers.add_parser("history", help="Show recent audit history (file-backed if configured).")
+    hist.add_argument("history_cmd", nargs="?", default="list", choices=["list", "stats"])
+    hist.add_argument("--domain", default=None)
+    hist.add_argument("--limit", type=int, default=20)
+    hist.add_argument("--json", action="store_true")
+    hist.add_argument("--out", default=None)
+    hist.add_argument("--timeout", type=float, default=None)
+
+    scoring_p = subparsers.add_parser("scoring", help="Print scoring weights documentation.")
+    scoring_p.add_argument("--out", default=None)
+    scoring_p.add_argument("--json", action="store_true")
 
     return parser
 
