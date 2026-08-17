@@ -12,7 +12,7 @@ from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dns_audit import audit_domain
 from inboxready_api.services.provider_detection import get_provider_catalog
 from inboxready_api.services.report import render_html_report, render_markdown_report
-from inboxready_api.services.history import configure_history, get_history
+from inboxready_api.services.history import compute_history_delta, configure_history, get_history
 from inboxready_api.services.scoring import scoring_document
 from inboxready_api.settings import Settings, get_settings
 
@@ -66,6 +66,40 @@ def run_command(args: argparse.Namespace) -> int:
         write_output(output, getattr(args, "out", None))
         return EXIT_PASS
 
+    if args.command == "delta":
+        settings = resolve_settings(args)
+        configure_history(
+            max_entries=settings.history_max_entries,
+            path=settings.history_path or None,
+        )
+        store = get_history()
+        domain = args.domain
+        entries = store.list(domain=domain, limit=2)
+        if args.json:
+            if not entries:
+                payload = {"domain": domain, "previous": None, "latest": None, "score_delta": None}
+            elif len(entries) == 1:
+                payload = {
+                    "domain": domain,
+                    "previous": None,
+                    "latest": entries[0].score,
+                    "score_delta": None,
+                    "changed_checks": entries[0].changed_checks,
+                }
+            else:
+                newer, older = entries[0], entries[1]
+                payload = {
+                    "domain": domain,
+                    "previous": older.score,
+                    "latest": newer.score,
+                    "score_delta": newer.score - older.score,
+                    "changed_checks": newer.changed_checks,
+                }
+            write_output(json.dumps(payload, indent=2), getattr(args, "out", None))
+            return EXIT_PASS
+        write_output(format_delta_text(domain, entries), getattr(args, "out", None))
+        return EXIT_PASS
+
     if args.command == "scoring":
         payload = scoring_document()
         write_output(json.dumps(payload, indent=2), getattr(args, "out", None))
@@ -107,6 +141,10 @@ def run_command(args: argparse.Namespace) -> int:
 
     if args.command == "audit":
         settings = resolve_settings(args)
+        configure_history(
+            max_entries=settings.history_max_entries,
+            path=settings.history_path or None,
+        )
         selectors = split_csv_values(args.selectors)
         expected_providers = split_csv_values(args.expected_providers)
 
@@ -119,6 +157,7 @@ def run_command(args: argparse.Namespace) -> int:
                 ),
                 settings,
             )
+            result = _record_cli_audit(result)
             fmt = resolve_format(args)
             if fmt == "json":
                 output = result.model_dump_json(indent=2)
@@ -214,6 +253,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("version", help="Print package version.")
 
+    delta_parser = subparsers.add_parser("delta", help="Show the last two scores for a domain.")
+    delta_parser.add_argument("domain", help="Domain to compare in history.")
+    delta_parser.add_argument("--json", action="store_true")
+    delta_parser.add_argument("--out", default=None)
+    delta_parser.add_argument("--timeout", type=float, default=None)
+
 
     hist = subparsers.add_parser("history", help="Show recent audit history (file-backed if configured).")
     hist.add_argument("history_cmd", nargs="?", default="list", choices=["list", "stats"])
@@ -258,11 +303,46 @@ def split_csv_values(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _record_cli_audit(result):
+    checks = {name: check.status for name, check in result.checks.items()}
+    previous = get_history().latest(result.domain)
+    delta, changed = compute_history_delta(result.score, checks, previous)
+    updated = result.model_copy(update={"score_delta": delta, "changed_checks": changed})
+    get_history().add(
+        domain=updated.domain,
+        score=updated.score,
+        overall_status=updated.overall_status,
+        checked_at=updated.checked_at,
+        checks=checks,
+        score_delta=delta,
+        changed_checks=changed,
+    )
+    return updated
+
+
+def format_delta_text(domain: str, entries: list) -> str:
+    if not entries:
+        return f"{domain}: no audit history"
+    if len(entries) == 1:
+        return f"{domain}: {entries[0].score} (no previous audit)"
+    newer, older = entries[0], entries[1]
+    delta = newer.score - older.score
+    sign = "+" if delta > 0 else ""
+    lines = [f"{domain}: {older.score} -> {newer.score} ({sign}{delta})"]
+    if newer.changed_checks:
+        lines.append("changed_checks: " + ", ".join(newer.changed_checks))
+    return "\n".join(lines)
+
+
 def format_domain_text(result: object) -> str:
     lines = [
         f"InboxReady audit: {result.domain}",
         f"Score: {result.score}/100 ({result.overall_status})",
     ]
+    score_delta = getattr(result, "score_delta", None)
+    if score_delta is not None:
+        sign = "+" if score_delta > 0 else ""
+        lines.append(f"Score delta: {sign}{score_delta}")
 
     if result.providers:
         providers = ", ".join(provider.name for provider in result.providers)

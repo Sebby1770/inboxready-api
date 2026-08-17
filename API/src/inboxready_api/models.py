@@ -58,6 +58,8 @@ class DomainAuditResponse(BaseModel):
     checks: dict[str, AuditCheck]
     recommendations: list[Recommendation] = Field(default_factory=list)
     references: list[HttpUrl] = Field(default_factory=list)
+    score_delta: int | None = None
+    changed_checks: list[str] = Field(default_factory=list)
 
 
 class BatchAuditRequest(BaseModel):
@@ -124,3 +126,26 @@ class CompareResponse(BaseModel):
 class CacheClearResponse(BaseModel):
     cleared: int
     message: str
+
+
+class PlaybookItem(BaseModel):
+    check: str
+    code: str | None = None
+    message: str
+    severity: str | None = None
+
+
+class PlaybookRequest(BaseModel):
+    domain: str | None = None
+    checks: dict[str, AuditCheck] | None = None
+    recommendations: list[Recommendation] = Field(default_factory=list)
+
+
+class PlaybookResponse(BaseModel):
+    domain: str | None = None
+    score: int | None = None
+    quick: list[PlaybookItem] = Field(default_factory=list)
+    half_day: list[PlaybookItem] = Field(default_factory=list, alias="half-day")
+    project: list[PlaybookItem] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}

@@ -2,11 +2,11 @@
 
 InboxReady is a Python/FastAPI service that audits whether customer domains are ready to send trustworthy email.
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
-It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI; detects likely sending providers; returns a weighted readiness score and remediation guidance; and includes caching, optional API keys, rate limiting, domain compare, and markdown reports.
+It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, BIMI, and CAA; detects likely sending providers; returns a weighted readiness score and remediation guidance; and includes caching, optional API keys, rate limiting, domain compare, playbooks, and markdown reports.
 
-## Features (v0.3)
+## Features (v0.4)
 
 - Single-domain and concurrent batch audits (up to 25 domains)
 - Provider fingerprint catalog
@@ -17,7 +17,10 @@ It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI; detects likely sendi
 - Free / disposable mailbox domain warnings
 - Liveness (`/healthz`) and readiness (`/readyz`) probes
 - CLI: `inboxready` with formats, exit codes, and compare
-- Landing page + interactive workspace
+- Landing page + interactive workspace with score sparkline and deltas
+- SPF include tree, DMARC 2024 sender policy, BIMI asset probe, CAA
+- History score deltas and `inboxready delta`
+- Effort-grouped playbook (`GET /v1/playbook/{domain}`)
 - GitHub Actions CI (Python 3.11+)
 
 ## Project layout
@@ -53,7 +56,7 @@ Copy [`API/.env.example`](./API/.env.example). All settings use the `INBOXREADY_
 | `INBOXREADY_RATE_LIMIT_PER_MINUTE` | `60` | Sliding window per key/IP (`0` disables) |
 | `INBOXREADY_CACHE_TTL_SECONDS` | `300` | Audit result TTL (`0` disables) |
 | `INBOXREADY_HTTP_TIMEOUT_SECONDS` | `5.0` | MTA-STS policy fetch timeout |
-| `INBOXREADY_USER_AGENT` | `InboxReady/0.2 ...` | Outbound User-Agent |
+| `INBOXREADY_USER_AGENT` | `InboxReady/0.4 ...` | Outbound User-Agent |
 | `INBOXREADY_BATCH_MAX_WORKERS` | `8` | Thread pool for batch audits |
 
 ## API overview
@@ -71,6 +74,8 @@ Copy [`API/.env.example`](./API/.env.example). All settings use the `INBOXREADY_
 | `GET` | `/v1/history/stats` | Aggregate history |
 | `GET` | `/v1/history/export.csv` | CSV export |
 | `GET` | `/v1/scoring` | Score weights |
+| `GET` | `/v1/playbook/{domain}` | Effort-grouped remediation |
+| `POST` | `/v1/playbook` | Playbook from last audit or POST body |
 | `POST` | `/v1/cache/clear` | Clear in-memory cache |
 
 Auth (when keys configured or `REQUIRE_API_KEY=true`):
@@ -91,6 +96,7 @@ inboxready audit example.com --format md --out report.md
 inboxready audit example.com --json
 inboxready audit a.com b.com --timeout 10
 inboxready compare a.com b.com
+inboxready delta example.com
 ```
 
 Exit codes: `0` pass, `1` overall fail, `2` error.

@@ -92,7 +92,53 @@ function renderErrorState(target, message) {
   `;
 }
 
-function renderAudit(target, audit) {
+function formatScoreDelta(delta) {
+  if (delta === null || delta === undefined) return "";
+  const numeric = Number(delta);
+  if (!Number.isFinite(numeric)) return "";
+  const sign = numeric > 0 ? "+" : "";
+  const cls = numeric > 0 ? "delta-up" : numeric < 0 ? "delta-down" : "delta-flat";
+  return `<span class="score-delta ${cls}">${sign}${escapeHtml(numeric)}</span>`;
+}
+
+function renderSparkline(scores) {
+  if (!Array.isArray(scores) || !scores.length) return "";
+  const values = scores.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  if (!values.length) return "";
+
+  const width = 168;
+  const height = 36;
+  const pad = 3;
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 100);
+  const span = max - min || 1;
+  const denom = Math.max(values.length - 1, 1);
+  const points = values
+    .map((score, index) => {
+      const x = pad + (index * (width - pad * 2)) / denom;
+      const y = height - pad - ((score - min) / span) * (height - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return `
+    <div class="score-history">
+      <svg class="score-sparkline" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Score history">
+        <polyline points="${points}"></polyline>
+      </svg>
+    </div>
+  `;
+}
+
+async function loadHistoryScores(domain) {
+  const response = await fetch(`/v1/history?domain=${encodeURIComponent(domain)}&limit=20`);
+  if (!response.ok) return [];
+  const payload = await response.json();
+  const entries = Array.isArray(payload.entries) ? payload.entries : [];
+  return entries.map((entry) => entry.score).reverse();
+}
+
+function renderAudit(target, audit, historyScores = []) {
   const providers = audit.providers.length
     ? audit.providers
         .map(
@@ -150,11 +196,12 @@ function renderAudit(target, audit) {
         </div>
 
         <div class="report-title">
-          <h3>${escapeHtml(audit.domain)}</h3>
+          <h3>${escapeHtml(audit.domain)} ${formatScoreDelta(audit.score_delta)}</h3>
           <p>Checked ${new Date(audit.checked_at).toLocaleString()}</p>
           <span class="status-pill status-${escapeHtml(audit.overall_status)}">
             ${getStatusLabel(audit.overall_status)}
           </span>
+          ${renderSparkline(historyScores)}
         </div>
       </div>
 
@@ -252,7 +299,13 @@ function initAuditForm(form) {
     try {
       const audit = await runAudit(payload);
       saveRecentDomain(audit.domain);
-      renderAudit(resultsTarget, audit);
+      let historyScores = [];
+      try {
+        historyScores = await loadHistoryScores(audit.domain);
+      } catch {
+        historyScores = [];
+      }
+      renderAudit(resultsTarget, audit, historyScores);
       renderRecentDomains(recentTarget, (recentDomain) => {
         domainInput.value = recentDomain;
         form.requestSubmit();

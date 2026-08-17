@@ -2,7 +2,7 @@
 
 InboxReady is a practical API-as-a-Service for verifying whether a customer domain is ready to send trustworthy email.
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Why This Idea
 
@@ -19,7 +19,7 @@ InboxReady turns that into one API call.
 
 - Polished SaaS landing page at `/`
 - Interactive audit workspace at `/app`
-- Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
+- Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, BIMI, and CAA
 - Detects likely sending providers from DNS evidence
 - Scores domain readiness from 0–100
 - Structured findings + actionable remediation guidance
@@ -30,7 +30,10 @@ InboxReady turns that into one API call.
 - Concurrent batch audits (up to 25 domains)
 - Free / disposable mailbox domain warnings
 - `/healthz` and `/readyz` with version
-- CLI with formats, `--out`, `--timeout`, exit codes
+- CLI with formats, `--out`, `--timeout`, exit codes, and `delta`
+- SPF include-tree expansion and DMARC 2024 sender requirements
+- BIMI logo probe and score deltas between audits
+- Remediation playbook grouped by effort
 
 ## Endpoints
 
@@ -50,6 +53,8 @@ InboxReady turns that into one API call.
 | `GET` | `/v1/history/stats` | Aggregate history |
 | `GET` | `/v1/history/export.csv` | CSV export |
 | `GET` | `/v1/scoring` | Score weights |
+| `GET` | `/v1/playbook/{domain}` | Effort-grouped remediation |
+| `POST` | `/v1/playbook` | Playbook from last audit or POST body |
 | `POST` | `/v1/cache/clear` |
 
 ## Quick Start
@@ -133,6 +138,7 @@ inboxready audit example.com --selectors google,selector1
 inboxready audit example.com --format md --out report.md
 inboxready audit example.com openai.com --json
 inboxready compare example.com openai.com
+inboxready delta example.com
 ```
 
 Exit codes: **0** pass, **1** fail overall, **2** error.
