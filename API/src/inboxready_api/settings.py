@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     http_timeout_seconds: float = 5.0
-    user_agent: str = "InboxReady/0.3 (+https://example.com)"
+    user_agent: str = "InboxReady/0.4 (+https://example.com)"
     api_keys: str = Field(
         default="",
         description="Comma-separated API keys. When set, X-API-Key is required.",

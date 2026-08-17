@@ -2,7 +2,7 @@ from __future__ import annotations
 
 HERO_METRICS = [
     {
-        "value": "7",
+        "value": "8",
         "label": "protocol checks in every audit",
     },
     {
@@ -22,6 +22,7 @@ SIGNAL_STRIPS = [
     "BIMI",
     "MTA-STS",
     "TLS-RPT",
+    "CAA",
     "Provider detection",
 ]
 

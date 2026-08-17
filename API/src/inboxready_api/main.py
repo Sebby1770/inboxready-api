@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import dns.resolver
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -18,6 +18,7 @@ from inboxready_api.models import (
     CompareResponse,
     DomainAuditRequest,
     DomainAuditResponse,
+    PlaybookRequest,
     ProviderCatalogResponse,
 )
 from inboxready_api.security import require_api_access
@@ -26,7 +27,8 @@ from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dns_audit import audit_domain, normalize_domain
 from inboxready_api.services.provider_detection import get_provider_catalog
 from inboxready_api.services.report import render_html_report, render_markdown_report
-from inboxready_api.services.history import configure_history, get_history
+from inboxready_api.services.history import compute_history_delta, configure_history, get_history
+from inboxready_api.services.playbook import build_playbook
 from inboxready_api.services.scoring import scoring_document
 from inboxready_api.middleware import RequestIdMiddleware
 from inboxready_api.settings import get_settings
@@ -50,8 +52,8 @@ app = FastAPI(
     summary="Developer-first email domain readiness checks.",
     description=(
         "Audit email authentication posture for customer-owned domains. "
-        "Checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI with optional "
-        "API keys, rate limiting, result caching, compare, and markdown reports."
+        "Checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, BIMI, and CAA with optional "
+        "API keys, rate limiting, result caching, compare, playbooks, and markdown reports."
     ),
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -171,6 +173,16 @@ def list_providers(_auth: str = Depends(require_api_access)) -> ProviderCatalogR
     return ProviderCatalogResponse(providers=get_provider_catalog())
 
 
+def _check_statuses(result: DomainAuditResponse) -> dict[str, str]:
+    return {name: check.status for name, check in result.checks.items()}
+
+
+def _with_history_delta(result: DomainAuditResponse) -> DomainAuditResponse:
+    previous = get_history().latest(result.domain)
+    delta, changed = compute_history_delta(result.score, _check_statuses(result), previous)
+    return result.model_copy(update={"score_delta": delta, "changed_checks": changed})
+
+
 def _record_audit(result, cache_status: str) -> None:
     get_history().add(
         domain=result.domain,
@@ -178,6 +190,9 @@ def _record_audit(result, cache_status: str) -> None:
         overall_status=result.overall_status,
         checked_at=result.checked_at,
         cached=cache_status == "HIT",
+        checks=_check_statuses(result),
+        score_delta=result.score_delta,
+        changed_checks=list(result.changed_checks or []),
     )
     _maybe_webhook(result)
 
@@ -213,6 +228,7 @@ def create_email_domain_audit(
     _auth: str = Depends(require_api_access),
 ):
     result, cache_status = _run_cached_audit(body)
+    result = _with_history_delta(result)
     response.headers["X-Cache"] = cache_status
     _record_audit(result, cache_status)
 
@@ -277,6 +293,46 @@ def create_domain_compare(
 @app.get("/v1/scoring")
 def get_scoring_document(_auth: str = Depends(require_api_access)) -> dict:
     return scoring_document()
+
+
+def _playbook_payload(result: DomainAuditResponse) -> dict:
+    groups = build_playbook(result.checks, result.recommendations)
+    return {
+        "domain": result.domain,
+        "score": result.score,
+        "quick": groups["quick"],
+        "half-day": groups["half-day"],
+        "project": groups["project"],
+    }
+
+
+@app.get("/v1/playbook/{domain}")
+def get_playbook(
+    domain: str,
+    _auth: str = Depends(require_api_access),
+) -> dict:
+    result, _cache_status = _run_cached_audit(DomainAuditRequest(domain=domain))
+    return _playbook_payload(result)
+
+
+@app.post("/v1/playbook")
+def create_playbook(
+    body: PlaybookRequest,
+    _auth: str = Depends(require_api_access),
+) -> dict:
+    if body.checks:
+        groups = build_playbook(body.checks, body.recommendations)
+        return {
+            "domain": body.domain,
+            "score": None,
+            "quick": groups["quick"],
+            "half-day": groups["half-day"],
+            "project": groups["project"],
+        }
+    if body.domain:
+        result, _cache_status = _run_cached_audit(DomainAuditRequest(domain=body.domain))
+        return _playbook_payload(result)
+    raise HTTPException(status_code=400, detail="Provide a domain or checks to build a playbook.")
 
 
 @app.get("/v1/history")

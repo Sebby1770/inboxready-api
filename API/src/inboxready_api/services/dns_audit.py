@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from email.utils import parseaddr
 import re
+from typing import Any
 
 import dns.exception
 import dns.resolver
@@ -23,6 +24,8 @@ from inboxready_api.settings import Settings
 DMARC_REFERENCE = "https://dmarc.org/"
 GOOGLE_REFERENCE = "https://support.google.com/a/answer/81126?hl=en-AL"
 YAHOO_REFERENCE = "https://senders.yahooinc.com/faqs/"
+SPF_EXPAND_MAX_DEPTH = 3
+ResolveTxt = Callable[[str], list[str]] | Mapping[str, list[str]]
 
 
 def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAuditResponse:
@@ -43,7 +46,10 @@ def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAudit
     checks["mx"] = mx_check
     recommendations.extend(recommendations_for_check("mx", mx_check))
 
-    spf_check = build_spf_check(root_txt)
+    def resolve_txt(name: str) -> list[str]:
+        return query_records(resolver, name, "TXT")
+
+    spf_check = build_spf_check(root_txt, resolve_txt=resolve_txt)
     checks["spf"] = spf_check
     recommendations.extend(recommendations_for_check("spf", spf_check))
 
@@ -67,9 +73,25 @@ def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAudit
     recommendations.extend(recommendations_for_check("tls_rpt", tls_rpt_check))
 
     bimi_records = query_records(resolver, f"default._bimi.{domain}", "TXT")
-    bimi_check = build_bimi_check(bimi_records, checks["dmarc"])
+    http_client: httpx.Client | None = None
+    try:
+        if any(record.lower().startswith("v=bimi1") and "l=" in record.lower() for record in bimi_records):
+            http_client = httpx.Client(
+                timeout=settings.http_timeout_seconds,
+                headers={"User-Agent": settings.user_agent},
+                follow_redirects=True,
+            )
+        bimi_check = build_bimi_check(bimi_records, checks["dmarc"], http_client=http_client)
+    finally:
+        if http_client is not None:
+            http_client.close()
     checks["bimi"] = bimi_check
     recommendations.extend(recommendations_for_check("bimi", bimi_check))
+
+    caa_records = query_records(resolver, domain, "CAA")
+    caa_check = build_caa_check(caa_records)
+    checks["caa"] = caa_check
+    recommendations.extend(recommendations_for_check("caa", caa_check))
 
     providers = append_expected_provider_warnings(providers, request.expected_providers, recommendations)
 
@@ -167,7 +189,10 @@ def build_mx_check(mx_records: list[str]) -> AuditCheck:
     )
 
 
-def build_spf_check(root_txt_records: list[str]) -> AuditCheck:
+def build_spf_check(
+    root_txt_records: list[str],
+    resolve_txt: ResolveTxt | None = None,
+) -> AuditCheck:
     spf_records = [record for record in root_txt_records if record.lower().startswith("v=spf1")]
 
     if not spf_records:
@@ -199,10 +224,16 @@ def build_spf_check(root_txt_records: list[str]) -> AuditCheck:
         status = "warn"
         summary = "SPF exists but the terminal policy is weak."
 
+    details: dict[str, Any] = dict(parsed)
+    if resolve_txt is not None:
+        tree = expand_spf(record, resolve_txt)
+        details["include_tree"] = tree
+        details["resolved_dns_lookups"] = tree["resolved_lookups"]
+
     return AuditCheck(
         status=status,
         summary=summary,
-        details=parsed,
+        details=details,
     )
 
 
@@ -232,6 +263,163 @@ def parse_spf_record(record: str) -> dict[str, object]:
     }
 
 
+def _as_txt_resolver(resolve_txt: ResolveTxt) -> Callable[[str], list[str]]:
+    if callable(resolve_txt):
+        return resolve_txt
+
+    zone = resolve_txt
+
+    def lookup(name: str) -> list[str]:
+        if name in zone:
+            return list(zone[name])
+        wanted = name.lower().rstrip(".")
+        for key, value in zone.items():
+            if str(key).lower().rstrip(".") == wanted:
+                return list(value)
+        return []
+
+    return lookup
+
+
+def _spf_mechanism_domain(token: str) -> str | None:
+    raw = token.lstrip("+-~?")
+    if raw.lower().startswith("include:"):
+        return raw.split(":", 1)[1].strip().rstrip(".").lower() or None
+    if raw.lower().startswith("redirect="):
+        return raw.split("=", 1)[1].strip().rstrip(".").lower() or None
+    return None
+
+
+def _first_spf_record(records: list[str]) -> str | None:
+    for record in records:
+        if record.lower().startswith("v=spf1"):
+            return record
+    return None
+
+
+def expand_spf(
+    record: str,
+    resolve_txt: ResolveTxt,
+    *,
+    max_depth: int = SPF_EXPAND_MAX_DEPTH,
+) -> dict[str, Any]:
+    """Recursively follow include: and redirect= using an injected TXT resolver.
+
+    Counts resolved lookups only (each include/redirect that is actually queried).
+    Detects cycles along the current expansion path. Depth is capped at ``max_depth``
+    (default 3) from the original record.
+    """
+
+    resolver = _as_txt_resolver(resolve_txt)
+    return _expand_spf(
+        record,
+        resolver,
+        max_depth=max_depth,
+        depth=0,
+        trail=(),
+    )
+
+
+def _expand_spf(
+    record: str,
+    resolve_txt: Callable[[str], list[str]],
+    *,
+    max_depth: int,
+    depth: int,
+    trail: tuple[str, ...],
+) -> dict[str, Any]:
+    includes: list[dict[str, Any]] = []
+    redirect: dict[str, Any] | None = None
+    resolved_lookups = 0
+    cycle = False
+    truncated = False
+
+    for token in record.split()[1:]:
+        mechanism = "include" if token.lstrip("+-~?").lower().startswith("include:") else None
+        if token.lower().startswith("redirect=") or token.lstrip("+-~?").lower().startswith("redirect="):
+            mechanism = "redirect"
+        if mechanism is None:
+            continue
+
+        domain = _spf_mechanism_domain(token)
+        node: dict[str, Any] = {
+            "mechanism": mechanism,
+            "term": token,
+            "domain": domain,
+            "cycle": False,
+            "truncated": False,
+            "missing": False,
+            "record": None,
+            "children": None,
+        }
+        if not domain:
+            node["missing"] = True
+            if mechanism == "redirect":
+                redirect = node
+            else:
+                includes.append(node)
+            continue
+
+        if domain in trail:
+            node["cycle"] = True
+            cycle = True
+            if mechanism == "redirect":
+                redirect = node
+            else:
+                includes.append(node)
+            continue
+
+        if depth >= max_depth:
+            node["truncated"] = True
+            truncated = True
+            if mechanism == "redirect":
+                redirect = node
+            else:
+                includes.append(node)
+            continue
+
+        resolved_lookups += 1
+        try:
+            answers = list(resolve_txt(domain) or [])
+        except Exception:
+            answers = []
+        child_record = _first_spf_record(answers)
+        if child_record is None:
+            node["missing"] = True
+        else:
+            node["record"] = child_record
+            child = _expand_spf(
+                child_record,
+                resolve_txt,
+                max_depth=max_depth,
+                depth=depth + 1,
+                trail=trail + (domain,),
+            )
+            node["children"] = child
+            resolved_lookups += int(child["resolved_lookups"])
+            if child["cycle"]:
+                node["cycle"] = True
+                cycle = True
+            if child["truncated"]:
+                node["truncated"] = True
+                truncated = True
+
+        if mechanism == "redirect":
+            redirect = node
+        else:
+            includes.append(node)
+
+    return {
+        "record": record,
+        "depth": depth,
+        "resolved_lookups": resolved_lookups,
+        "cycle": cycle,
+        "truncated": truncated,
+        "includes": includes,
+        "redirect": redirect,
+    }
+
+
 def build_dmarc_check(dmarc_records: list[str]) -> AuditCheck:
     records = [record for record in dmarc_records if record.lower().startswith("v=dmarc1")]
 
@@ -244,29 +432,47 @@ def build_dmarc_check(dmarc_records: list[str]) -> AuditCheck:
 
     record = records[0]
     tags = parse_semicolon_tags(record)
-    policy = tags.get("p", "none").lower()
-    rua = tags.get("rua")
-    status = "pass"
-    summary = "DMARC record is present."
+    policy = (tags.get("p") or "none").lower()
+    subdomain_policy = tags.get("sp")
+    percentage = tags.get("pct")
+    adkim = tags.get("adkim")
+    aspf = tags.get("aspf")
+    rua = extract_mailto_targets(tags.get("rua"))
+    ruf = extract_mailto_targets(tags.get("ruf"))
 
-    if policy == "none":
-        status = "warn"
-        summary = "DMARC is present but still in monitoring mode."
+    details: dict[str, Any] = {
+        "record": record,
+        "policy": policy,
+        "p": policy,
+        "sp": subdomain_policy.lower() if subdomain_policy else None,
+        "subdomain_policy": subdomain_policy.lower() if subdomain_policy else None,
+        "pct": percentage,
+        "percentage": percentage,
+        "adkim": adkim.lower() if adkim else None,
+        "aspf": aspf.lower() if aspf else None,
+        "rua": rua,
+        "ruf": ruf,
+        "mailto_targets": {"rua": rua, "ruf": ruf},
+    }
 
     if not rua:
-        summary = f"{summary} No aggregate reporting mailbox is configured."
+        return AuditCheck(
+            status="fail",
+            summary="DMARC record is present but has no rua aggregate reporting address.",
+            details=details,
+        )
+
+    if policy == "none":
+        return AuditCheck(
+            status="warn",
+            summary="DMARC p=none does not meet 2024 Gmail/Yahoo bulk-sender requirements.",
+            details=details,
+        )
 
     return AuditCheck(
-        status=status,
-        summary=summary,
-        details={
-            "record": record,
-            "policy": policy,
-            "subdomain_policy": tags.get("sp"),
-            "percentage": tags.get("pct"),
-            "rua": extract_mailto_targets(rua),
-            "ruf": extract_mailto_targets(tags.get("ruf")),
-        },
+        status="pass",
+        summary="DMARC record is present.",
+        details=details,
     )
 
 
@@ -399,7 +605,80 @@ def build_tls_rpt_check(records: list[str]) -> AuditCheck:
     )
 
 
-def build_bimi_check(records: list[str], dmarc_check: AuditCheck) -> AuditCheck:
+def probe_bimi_asset(url: str, http_client: Any) -> dict[str, Any]:
+    """HEAD, then GET if needed. Never called without an injected client in tests."""
+
+    result: dict[str, Any] = {
+        "url": url,
+        "ok": False,
+        "content_type": None,
+        "bytes": 0,
+        "status_code": None,
+        "error": None,
+    }
+
+    def _read_response(response: Any) -> None:
+        status_code = getattr(response, "status_code", None)
+        try:
+            result["status_code"] = int(status_code) if status_code is not None else None
+        except (TypeError, ValueError):
+            result["status_code"] = None
+        headers = getattr(response, "headers", None) or {}
+        content_type = None
+        try:
+            content_type = headers.get("content-type") or headers.get("Content-Type")
+        except Exception:
+            content_type = None
+        if content_type:
+            result["content_type"] = str(content_type)
+        content_length = None
+        try:
+            content_length = headers.get("content-length") or headers.get("Content-Length")
+        except Exception:
+            content_length = None
+        if content_length is not None and str(content_length).isdigit():
+            result["bytes"] = int(content_length)
+        content = getattr(response, "content", None)
+        if isinstance(content, (bytes, bytearray, str)):
+            result["bytes"] = len(content)
+        code = result["status_code"]
+        result["ok"] = isinstance(code, int) and 200 <= code < 300
+
+    try:
+        response = http_client.head(url)
+        _read_response(response)
+    except Exception as exc:  # pragma: no cover - client-specific
+        result["error"] = str(exc)
+
+    needs_get = (
+        not result["ok"]
+        or not result["content_type"]
+        or result["status_code"] in {405, 501}
+    )
+    if needs_get:
+        try:
+            response = http_client.get(url)
+            _read_response(response)
+            if result["ok"]:
+                result["error"] = None
+        except Exception as exc:
+            result["error"] = str(exc)
+
+    return result
+
+
+def _is_svg_or_xml(content_type: str | None) -> bool:
+    if not content_type:
+        return False
+    lowered = content_type.lower()
+    return "svg" in lowered or "xml" in lowered
+
+
+def build_bimi_check(
+    records: list[str],
+    dmarc_check: AuditCheck,
+    http_client: Any | None = None,
+) -> AuditCheck:
     valid_records = [record for record in records if record.lower().startswith("v=bimi1")]
 
     if not valid_records:
@@ -409,19 +688,95 @@ def build_bimi_check(records: list[str], dmarc_check: AuditCheck) -> AuditCheck:
             details={"records": []},
         )
 
+    record = valid_records[0]
+    tags = parse_semicolon_tags(record)
+    logo_url = (tags.get("l") or "").strip() or None
+    authority_url = (tags.get("a") or "").strip() or None
     dmarc_policy = str(dmarc_check.details.get("policy") or "")
     status = "pass" if dmarc_policy in {"quarantine", "reject"} else "warn"
     summary = "BIMI record is present."
     if status == "warn":
         summary = "BIMI record exists, but DMARC is not yet at quarantine or reject."
 
+    details: dict[str, Any] = {
+        "record": record,
+        "logo_url": logo_url,
+        "authority_url": authority_url,
+        "dmarc_policy": dmarc_policy,
+    }
+
+    if logo_url and http_client is not None:
+        asset = probe_bimi_asset(logo_url, http_client)
+        details["asset"] = asset
+        if not asset.get("ok"):
+            status = "warn"
+            summary = "BIMI logo URL is missing or could not be fetched."
+        elif _is_svg_or_xml(asset.get("content_type")):
+            if status == "pass":
+                summary = "BIMI record and SVG/XML logo are present."
+        else:
+            status = "warn"
+            summary = "BIMI logo URL did not return SVG or XML."
+    elif not logo_url:
+        details["asset"] = None
+        if status == "pass":
+            status = "warn"
+            summary = "BIMI record exists but has no l= logo URL."
+
     return AuditCheck(
         status=status,
         summary=summary,
+        details=details,
+    )
+
+
+def build_caa_check(records: list[str], *, nxdomain: bool = False) -> AuditCheck:
+    parsed: list[dict[str, str]] = []
+    issue_tags: list[str] = []
+    for raw in records:
+        flags, tag, value = _parse_caa_line(raw)
+        entry = {"flags": flags, "tag": tag, "value": value, "raw": raw}
+        parsed.append(entry)
+        if tag == "issue" and value:
+            issue_tags.append(value)
+
+    if nxdomain or not records:
+        summary = "No CAA records published (NXDOMAIN)." if nxdomain else "No CAA records found."
+        return AuditCheck(
+            status="info",
+            summary=summary,
+            details={
+                "records": records,
+                "issue": issue_tags,
+                "parsed": parsed,
+                "nxdomain": nxdomain,
+            },
+        )
+
+    return AuditCheck(
+        status="pass",
+        summary=f"Found {len(issue_tags)} CAA issue tag(s).",
         details={
-            "record": valid_records[0],
+            "records": records,
+            "issue": issue_tags,
+            "parsed": parsed,
+            "nxdomain": False,
         },
     )
+
+
+def _parse_caa_line(raw: str) -> tuple[str, str, str]:
+    match = re.match(
+        r'^\s*(?P<flags>\d+)\s+(?P<tag>\S+)\s+"?(?P<value>[^"]*)"?\s*$',
+        raw.strip(),
+    )
+    if match:
+        return match.group("flags"), match.group("tag").lower(), match.group("value").strip()
+    parts = raw.split(None, 2)
+    if len(parts) >= 2:
+        value = parts[2].strip().strip('"') if len(parts) > 2 else ""
+        return parts[0], parts[1].lower(), value
+    return "0", "", raw.strip()
 
 
 def parse_semicolon_tags(record: str) -> dict[str, str]:
@@ -441,7 +796,13 @@ def extract_mailto_targets(raw_value: str | None) -> list[str]:
 
     mailboxes: list[str] = []
     for candidate in raw_value.split(","):
-        _, address = parseaddr(candidate.strip())
+        text = candidate.strip()
+        if text.lower().startswith("mailto:"):
+            text = text[7:]
+        text = text.split("!", 1)[0].strip()
+        _, address = parseaddr(text)
+        if address.lower().startswith("mailto:"):
+            address = address[7:]
         if address:
             mailboxes.append(address)
     return mailboxes
@@ -524,6 +885,15 @@ def recommendations_for_check(name: str, check: AuditCheck) -> list[Recommendati
 
     if name == "dmarc":
         if check.status == "fail":
+            if check.details.get("record"):
+                return [
+                    Recommendation(
+                        severity="high",
+                        code="dmarc-rua-missing",
+                        message="Add a DMARC rua mailbox so aggregate reports have somewhere to go.",
+                        details="Gmail and Yahoo expect bulk senders to publish DMARC with reporting.",
+                    )
+                ]
             return [
                 Recommendation(
                     severity="high",
@@ -537,7 +907,7 @@ def recommendations_for_check(name: str, check: AuditCheck) -> list[Recommendati
                 Recommendation(
                     severity="medium",
                     code="dmarc-monitoring-only",
-                    message="DMARC exists but is still set to monitoring mode.",
+                    message="DMARC p=none does not meet 2024 Gmail/Yahoo bulk-sender requirements.",
                     details="Move toward quarantine or reject after validating legitimate senders.",
                 )
             ]
@@ -583,14 +953,27 @@ def recommendations_for_check(name: str, check: AuditCheck) -> list[Recommendati
         ]
 
     if name == "bimi" and check.status == "warn":
-        return [
-            Recommendation(
-                severity="low",
-                code="bimi-dmarc-prereq",
-                message="Move DMARC to quarantine or reject before relying on BIMI.",
-                details="Mailbox providers generally require stronger DMARC posture before showing logos.",
+        recs: list[Recommendation] = []
+        asset = check.details.get("asset")
+        if isinstance(asset, dict) and not asset.get("ok"):
+            recs.append(
+                Recommendation(
+                    severity="low",
+                    code="bimi-asset-missing",
+                    message="Host a publicly reachable SVG/XML logo at the BIMI l= URL.",
+                    details="BIMI records without a fetchable logo will not display a brand mark.",
+                )
             )
-        ]
+        if str(check.details.get("dmarc_policy") or "") not in {"quarantine", "reject"}:
+            recs.append(
+                Recommendation(
+                    severity="low",
+                    code="bimi-dmarc-prereq",
+                    message="Move DMARC to quarantine or reject before relying on BIMI.",
+                    details="Mailbox providers generally require stronger DMARC posture before showing logos.",
+                )
+            )
+        return recs
 
     return []
 

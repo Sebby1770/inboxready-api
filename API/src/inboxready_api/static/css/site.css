@@ -615,6 +615,45 @@ input {
   letter-spacing: 0.04em;
 }
 
+.score-delta {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  font-family: var(--display-font);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.score-delta.delta-up {
+  color: var(--success);
+}
+
+.score-delta.delta-down {
+  color: var(--danger);
+}
+
+.score-delta.delta-flat {
+  color: var(--ink-soft);
+}
+
+.score-history {
+  margin-top: 0.7rem;
+}
+
+.score-sparkline {
+  display: block;
+  color: var(--teal);
+}
+
+.score-sparkline polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .report-title h3 {
   margin: 0;
   font-family: var(--display-font);

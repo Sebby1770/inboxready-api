@@ -10,8 +10,11 @@ def render_markdown_report(result: DomainAuditResponse) -> str:
         f"**Score:** {result.score}/100  ",
         f"**Status:** {result.overall_status}  ",
         f"**Checked at:** {result.checked_at}",
-        "",
     ]
+    if result.score_delta is not None:
+        sign = "+" if result.score_delta > 0 else ""
+        lines.append(f"**Score delta:** {sign}{result.score_delta}  ")
+    lines.append("")
 
     if result.providers:
         provider_names = ", ".join(provider.name for provider in result.providers)

@@ -7,7 +7,7 @@ import io
 import json
 import threading
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -20,6 +20,9 @@ class HistoryEntry:
     overall_status: str
     checked_at: str
     cached: bool = False
+    checks: dict[str, str] = field(default_factory=dict)
+    score_delta: int | None = None
+    changed_checks: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -48,6 +51,19 @@ class HistoryStore:
             if not isinstance(item, dict):
                 continue
             try:
+                checks_raw = item.get("checks") or {}
+                checks = (
+                    {str(key): str(value) for key, value in checks_raw.items()}
+                    if isinstance(checks_raw, dict)
+                    else {}
+                )
+                changed_raw = item.get("changed_checks") or []
+                changed_checks = (
+                    [str(value) for value in changed_raw] if isinstance(changed_raw, list) else []
+                )
+                score_delta = item.get("score_delta")
+                if score_delta is not None:
+                    score_delta = int(score_delta)
                 entries.append(
                     HistoryEntry(
                         domain=str(item["domain"]),
@@ -55,6 +71,9 @@ class HistoryStore:
                         overall_status=str(item.get("overall_status", "info")),
                         checked_at=str(item.get("checked_at", "")),
                         cached=bool(item.get("cached", False)),
+                        checks=checks,
+                        score_delta=score_delta,
+                        changed_checks=changed_checks,
                     )
                 )
             except (KeyError, TypeError, ValueError):
@@ -79,13 +98,27 @@ class HistoryStore:
         overall_status: str,
         checked_at: str | None = None,
         cached: bool = False,
+        checks: dict[str, str] | None = None,
+        score_delta: int | None = None,
+        changed_checks: list[str] | None = None,
     ) -> HistoryEntry:
+        check_map = dict(checks or {})
+        if score_delta is None or changed_checks is None:
+            previous = self.latest(domain)
+            computed_delta, computed_changed = compute_history_delta(score, check_map, previous)
+            if score_delta is None:
+                score_delta = computed_delta
+            if changed_checks is None:
+                changed_checks = computed_changed
         entry = HistoryEntry(
             domain=domain,
             score=score,
             overall_status=overall_status,
             checked_at=checked_at or datetime.now(UTC).isoformat(),
             cached=cached,
+            checks=check_map,
+            score_delta=score_delta,
+            changed_checks=list(changed_checks or []),
         )
         with self._lock:
             self._entries.append(entry)
@@ -94,16 +127,31 @@ class HistoryStore:
             self._persist_unlocked()
         return entry
 
+    def latest(self, domain: str) -> HistoryEntry | None:
+        items = self.list(domain=domain, limit=1)
+        return items[0] if items else None
+
     def list(
         self, *, domain: str | None = None, limit: int = 20
     ) -> list[HistoryEntry]:
+        from dataclasses import replace
+
         limit = max(1, min(limit, 500))
         with self._lock:
             items = list(self._entries)
         if domain:
             domain_l = domain.lower()
             items = [e for e in items if e.domain.lower() == domain_l]
-        return list(reversed(items[-limit:]))
+        previous_by_domain: dict[str, HistoryEntry] = {}
+        annotated: list[HistoryEntry] = []
+        for entry in items:
+            key = entry.domain.lower()
+            delta, changed = compute_history_delta(
+                entry.score, entry.checks or {}, previous_by_domain.get(key)
+            )
+            annotated.append(replace(entry, score_delta=delta, changed_checks=changed))
+            previous_by_domain[key] = entry
+        return list(reversed(annotated[-limit:]))
 
     def stats(self) -> dict[str, Any]:
         with self._lock:
@@ -130,7 +178,15 @@ class HistoryStore:
         buf = io.StringIO()
         writer = csv.DictWriter(
             buf,
-            fieldnames=["domain", "score", "overall_status", "checked_at", "cached"],
+            fieldnames=[
+                "domain",
+                "score",
+                "overall_status",
+                "checked_at",
+                "cached",
+                "score_delta",
+            ],
+            extrasaction="ignore",
         )
         writer.writeheader()
         for entry in items:
@@ -143,6 +199,22 @@ class HistoryStore:
             self._entries.clear()
             self._persist_unlocked()
         return n
+
+
+def compute_history_delta(
+    score: int,
+    checks: dict[str, str],
+    previous: HistoryEntry | None,
+) -> tuple[int | None, list[str]]:
+    """Compare a new audit to the previous same-domain entry."""
+
+    if previous is None:
+        return None, []
+    delta = score - previous.score
+    previous_checks = previous.checks or {}
+    names = set(checks) | set(previous_checks)
+    changed = sorted(name for name in names if checks.get(name) != previous_checks.get(name))
+    return delta, changed
 
 
 # Process-wide store (path configured at first access via configure_history).
