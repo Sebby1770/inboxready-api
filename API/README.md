@@ -2,7 +2,7 @@
 
 InboxReady is a practical API-as-a-Service for verifying whether a customer domain is ready to send trustworthy email.
 
-**Version:** 0.3.0
+**Version:** 0.5.0
 
 ## Why This Idea
 
@@ -17,8 +17,7 @@ InboxReady turns that into one API call.
 
 ## Features
 
-- Polished SaaS landing page at `/`
-- Interactive audit workspace at `/app`
+### Audit engine
 - Audits MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI
 - Detects likely sending providers from DNS evidence
 - Scores domain readiness from 0–100
@@ -32,12 +31,45 @@ InboxReady turns that into one API call.
 - `/healthz` and `/readyz` with version
 - CLI with formats, `--out`, `--timeout`, exit codes
 
+### Site surface (v0.5)
+
+- Twelve pages from a single registry in [`site/pages.py`](./src/inboxready_api/site/pages.py)
+- `Organization`, `ProfessionalService`, `WebSite`, `BreadcrumbList`, `FAQPage`,
+  and `Article` structured data, generated from the content the page renders
+- `robots.txt` and `sitemap.xml`, both environment-aware
+- Open Graph and Twitter cards with a bundled 1200×630 social card
+- Contact form with validation, honeypot, and a bounded lead store
+- Consent-gated GA4 — nothing is served without a measurement ID
+- Custom HTML 404 for browsers, JSON 404 for API clients
+- CSP and hardening headers; skip link, focus rings, and alt text throughout
+
+See [`docs/growth-checklist.md`](../docs/growth-checklist.md) for the full
+twenty-item map of feature → code → test.
+
 ## Endpoints
+
+### Pages
 
 | Method | Path |
 | --- | --- |
 | `GET` | `/` |
+| `GET` | `/product` |
+| `GET` | `/case-studies`, `/case-studies/{slug}` |
+| `GET` | `/pricing` |
+| `GET` | `/faq` |
+| `GET` | `/about` |
+| `GET` | `/contact` |
+| `POST` | `/contact` |
+| `GET` | `/thank-you` |
 | `GET` | `/app` |
+| `GET` | `/privacy`, `/terms`, `/security` |
+| `GET` | `/robots.txt`, `/sitemap.xml` |
+| `GET` | `/site/pages` |
+
+### API
+
+| Method | Path |
+| --- | --- |
 | `GET` | `/api` |
 | `GET` | `/healthz` |
 | `GET` | `/readyz` |

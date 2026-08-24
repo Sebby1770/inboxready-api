@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img"
+     aria-label="Illustrated placeholder for a team group photograph">
+  <title>Placeholder team photo</title>
+  <defs>
+    <linearGradient id="wall" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f7f1e7"/>
+      <stop offset="100%" stop-color="#e8e0d2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="600" fill="url(#wall)"/>
+  <rect y="470" width="1200" height="130" fill="#16243a" fill-opacity="0.06"/>
+
+  <g font-family="Avenir Next Condensed, Futura, Franklin Gothic Medium, sans-serif"
+     font-size="46" font-weight="700" letter-spacing="6" fill="#16243a" fill-opacity="0.16">
+    <text x="600" y="150" text-anchor="middle">INBOXREADY</text>
+  </g>
+
+  <g>
+    <g transform="translate(370 230)">
+      <circle cy="0" r="66" fill="#d95c43" fill-opacity="0.55"/>
+      <path d="M-118 250c0-84 52-128 118-128s118 44 118 128z" fill="#d95c43" fill-opacity="0.28"/>
+    </g>
+    <g transform="translate(600 200)">
+      <circle cy="0" r="74" fill="#17696d" fill-opacity="0.55"/>
+      <path d="M-130 280c0-92 58-142 130-142s130 50 130 142z" fill="#17696d" fill-opacity="0.28"/>
+    </g>
+    <g transform="translate(830 230)">
+      <circle cy="0" r="66" fill="#c2a15a" fill-opacity="0.6"/>
+      <path d="M-118 250c0-84 52-128 118-128s118 44 118 128z" fill="#c2a15a" fill-opacity="0.3"/>
+    </g>
+  </g>
+
+  <g font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="26" fill="#4d5d72">
+    <text x="600" y="545" text-anchor="middle">Placeholder group photo — replace with a real one.</text>
+  </g>
+  <rect x="1" y="1" width="1198" height="598" fill="none" stroke="#16243a" stroke-opacity="0.12" stroke-width="2"/>
+</svg>

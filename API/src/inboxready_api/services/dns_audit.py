@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from email.utils import parseaddr
-import re
 
 import dns.exception
 import dns.resolver

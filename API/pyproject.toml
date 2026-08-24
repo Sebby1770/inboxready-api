@@ -1,6 +1,6 @@
 [project]
 name = "inboxready-api"
-version = "0.3.0"
+version = "0.5.0"
 description = "A developer-first email domain readiness audit API."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,6 +9,7 @@ dependencies = [
   "fastapi>=0.115.0",
   "httpx>=0.28.0",
   "jinja2>=3.1.0",
+  "python-multipart>=0.0.20",
   "pydantic-settings>=2.7.0",
   "uvicorn[standard]>=0.34.0",
 ]
@@ -19,6 +20,7 @@ inboxready = "inboxready_api.cli:main"
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3.0",
+  "ruff>=0.8.0",
 ]
 
 [build-system]
@@ -38,6 +40,7 @@ inboxready_api = [
   "static/css/*.css",
   "static/js/*.js",
   "static/img/*.svg",
+  "static/img/team/*.svg",
 ]
 
 [tool.pytest.ini_options]
@@ -47,3 +50,18 @@ pythonpath = [
 testpaths = [
   "tests",
 ]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+  "B008",  # FastAPI dependencies are function calls in defaults by design.
+  "E501",  # Long prose strings in site content are more readable unwrapped.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]

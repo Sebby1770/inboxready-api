@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="section workspace-hero">
+  <section class="section workspace-hero above-the-fold">
     <div class="section-heading compact" data-reveal>
       <p class="section-kicker">Workspace</p>
-      <h1>Audit a domain, review the recommendations, and inspect the raw JSON in one place.</h1>
+      <h1>Audit a domain, read the recommendations, inspect the raw JSON</h1>
       <p>
-        This is the operator-facing surface for the same API that powers the landing page.
-        It is useful for demos, support, internal ops, and design-partner onboarding.
+        The operator-facing surface for the same API that powers everything else. Useful for
+        demos, support triage, and design-partner onboarding.
+        <a href="/product">See what each check looks for</a>.
       </p>
     </div>
   </section>
@@ -40,7 +41,7 @@
           Expected providers
           <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
         </label>
-        <button type="submit" class="button full-width">Run Domain Audit</button>
+        <button type="submit" class="button full-width" data-cta="workspace-run">Run domain audit</button>
       </form>
 
       <div class="sidebar-block">
@@ -51,9 +52,18 @@
       <div class="sidebar-block helper-card">
         <p class="sidebar-title">Good first test cases</p>
         <ul class="card-points">
-          <li>Try a customer domain you control.</li>
-          <li>Add likely selectors if the provider uses DKIM CNAMEs.</li>
-          <li>Use expected providers to catch misconfigured routing faster.</li>
+          <li>A customer domain you control.</li>
+          <li>Likely selectors, if the provider uses DKIM CNAMEs.</li>
+          <li>Expected providers, to catch misconfigured routing faster.</li>
+        </ul>
+      </div>
+
+      <div class="sidebar-block helper-card">
+        <p class="sidebar-title">Next steps</p>
+        <ul class="card-points">
+          <li><a href="/case-studies/onboarding-activation">Wire this into onboarding</a></li>
+          <li><a href="/pricing">What it costs at volume</a></li>
+          <li><a href="/contact">Ask about a specific domain</a></li>
         </ul>
       </div>
     </aside>
@@ -64,7 +74,7 @@
           <p class="panel-label">Results</p>
           <h2>Readiness report</h2>
         </div>
-        <a class="button button-secondary" href="/docs">Open API Schema</a>
+        <a class="button button-secondary" href="/docs">Open API schema</a>
       </div>
 
       <div class="result-shell tall" id="workspace-results"></div>

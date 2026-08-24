@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+from fastapi.testclient import TestClient
+
+from inboxready_api.main import app
+from inboxready_api.models import (
+    AuditCheck,
+    BatchAuditRequest,
+    DomainAuditResponse,
+    Recommendation,
+)
+from inboxready_api.services.batch_audit import summarize_batch, unique_normalized_domains
 from inboxready_api.services.dns_audit import (
     build_bimi_check,
     normalize_domain,
@@ -8,17 +18,7 @@ from inboxready_api.services.dns_audit import (
     parse_spf_record,
     score_checks,
 )
-from inboxready_api.models import (
-    AuditCheck,
-    BatchAuditRequest,
-    DomainAuditResponse,
-    Recommendation,
-)
-from inboxready_api.main import app
-from inboxready_api.services.batch_audit import summarize_batch, unique_normalized_domains
 from inboxready_api.services.provider_detection import detect_providers
-from fastapi.testclient import TestClient
-
 
 client = TestClient(app)
 
@@ -92,7 +92,7 @@ def test_workspace_page_renders() -> None:
     response = client.get("/app")
 
     assert response.status_code == 200
-    assert "Run Domain Audit" in response.text
+    assert "run domain audit" in response.text.lower()
 
 
 def test_unique_normalized_domains_keeps_first_seen_order() -> None:

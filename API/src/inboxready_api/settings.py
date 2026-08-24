@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     http_timeout_seconds: float = 5.0
-    user_agent: str = "InboxReady/0.3 (+https://example.com)"
+    user_agent: str = "InboxReady/0.5 (+https://github.com/Sebby1770/inboxready-api)"
     api_keys: str = Field(
         default="",
         description="Comma-separated API keys. When set, X-API-Key is required.",
@@ -54,6 +54,47 @@ class Settings(BaseSettings):
         description="Fire webhook when audit score is strictly below this value.",
     )
 
+    # --- Site / growth surface (v0.5) -------------------------------------
+    environment: str = Field(
+        default="development",
+        description="Deployment environment. Only 'production' is indexable by crawlers.",
+    )
+    site_base_url: str = Field(
+        default="",
+        description=(
+            "Absolute public origin (e.g. https://inboxready.dev). Used for canonical "
+            "URLs, sitemap entries, and social card metadata. Falls back to the request origin."
+        ),
+    )
+    analytics_ga4_id: str = Field(
+        default="",
+        description="Google Analytics 4 measurement ID (G-XXXXXXXXXX). Empty disables analytics.",
+    )
+    analytics_require_consent: bool = Field(
+        default=True,
+        description="Withhold analytics cookies until the visitor accepts the consent banner.",
+    )
+    support_response_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        description="Published first-response promise for support and sales enquiries, in hours.",
+    )
+    leads_path: str = Field(
+        default="",
+        description="Optional JSON file path for persisting contact form submissions.",
+    )
+    leads_max_entries: int = Field(
+        default=500,
+        ge=1,
+        le=10_000,
+        description="Max contact form submissions retained.",
+    )
+    security_headers_enabled: bool = Field(
+        default=True,
+        description="Emit CSP, Referrer-Policy, and related hardening headers on HTML responses.",
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="INBOXREADY_",
         env_file=".env",
@@ -67,9 +108,22 @@ class Settings(BaseSettings):
             return ""
         return str(value)
 
+    @field_validator("site_base_url", mode="before")
+    @classmethod
+    def strip_trailing_slash(cls, value: object) -> str:
+        return str(value or "").rstrip("/")
+
     @property
     def parsed_api_keys(self) -> set[str]:
         return {key.strip() for key in self.api_keys.split(",") if key.strip()}
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in {"production", "prod"}
+
+    @property
+    def analytics_enabled(self) -> bool:
+        return bool(self.analytics_ga4_id.strip())
 
 
 @lru_cache(maxsize=1)

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Contact</p>
+      <h1>Tell us what is going wrong with a domain</h1>
+      {# 08 — response time promise, stated before the form, not after it. #}
+      <p class="promise-banner">
+        <strong>{{ promise.headline }}.</strong>
+        {{ promise.business_days }}. {{ promise.escalation }}
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="mailto:{{ org.email }}" data-cta="contact-email">Email {{ org.email }}</a>
+        <a class="button button-secondary button-large" href="/app">Run an audit first</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section contact-layout">
+    <div class="panel contact-form-panel" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Send a message</p>
+          <h2>We read every one</h2>
+        </div>
+      </div>
+
+      {% if form_error %}
+        <p class="form-error" role="alert">{{ form_error }}</p>
+      {% endif %}
+
+      <form class="audit-form stacked" method="post" action="/contact" novalidate>
+        <label>
+          Your name
+          <input name="name" type="text" autocomplete="name" required
+                 value="{{ form_values.name if form_values else '' }}">
+        </label>
+        <label>
+          Work email
+          <input name="email" type="email" autocomplete="email" required
+                 value="{{ form_values.email if form_values else '' }}">
+        </label>
+        <label>
+          Company <span class="label-optional">(optional)</span>
+          <input name="company" type="text" autocomplete="organization"
+                 value="{{ form_values.company if form_values else '' }}">
+        </label>
+        <label>
+          What is this about?
+          <select name="topic">
+            {% for topic in topics %}
+              <option value="{{ topic }}"
+                {% if (form_values and form_values.topic == topic) or request.query_params.get('topic') == topic %}selected{% endif %}
+              >{{ topic }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Message
+          <textarea name="message" rows="6" required
+                    placeholder="The domain, what you expected, and what happened instead.">{{ form_values.message if form_values else '' }}</textarea>
+        </label>
+
+        {# Honeypot: hidden from people, irresistible to bots. #}
+        <div class="honeypot" aria-hidden="true">
+          <label>
+            Leave this field empty
+            <input name="website" type="text" tabindex="-1" autocomplete="off">
+          </label>
+        </div>
+
+        <button type="submit" class="button full-width" data-cta="contact-submit">Send message</button>
+        <p class="form-footnote">
+          We use what you send here to reply, and nothing else. See the
+          <a href="/privacy">privacy policy</a>.
+        </p>
+      </form>
+    </div>
+
+    {# 14 — maps and directions. #}
+    <aside class="panel contact-aside" data-reveal>
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Find us</p>
+          <h2>{{ org.address.locality }}, {{ org.address.region }}</h2>
+        </div>
+      </div>
+
+      <img
+        class="static-map"
+        src="{{ url_for('static', path='img/map-melbourne.svg') }}"
+        alt="Simplified map showing the InboxReady base in central {{ org.address.locality }}, {{ org.address.region }}, {{ org.address.country }}, marked with a pin at the intersection of the Yarra River and the city grid"
+        width="640"
+        height="400"
+        loading="lazy"
+        decoding="async"
+      >
+
+      <address class="contact-address">
+        <strong>{{ org.legal_name }}</strong><br>
+        {{ org.address.single_line }}<br>
+        <a href="mailto:{{ org.email }}">{{ org.email }}</a>
+      </address>
+
+      <div class="direction-links">
+        <a class="button button-secondary" href="{{ directions_url }}" rel="noopener external" target="_blank">
+          Directions in Google Maps
+        </a>
+        <a class="button button-secondary" href="{{ apple_maps_url }}" rel="noopener external" target="_blank">
+          Directions in Apple Maps
+        </a>
+        <a class="text-link" href="{{ map_view_url }}" rel="noopener external" target="_blank">
+          View on OpenStreetMap
+        </a>
+      </div>
+
+      <div class="sidebar-block">
+        <p class="sidebar-title">Hours</p>
+        <ul class="card-points">
+          {% for window in org.opening_hours %}
+            <li>{{ window }} ({{ org.timezone }})</li>
+          {% endfor %}
+          <li>Visits by arrangement — we are remote-first.</li>
+        </ul>
+      </div>
+
+      <div class="sidebar-block">
+        <p class="sidebar-title">Faster than email</p>
+        <ul class="card-points">
+          <li><a href="/healthz">/healthz</a> — is the service up?</li>
+          <li><a href="/faq">FAQ</a> — the eight questions we get most</li>
+          <li><a href="/docs">API docs</a> — every endpoint and schema</li>
+        </ul>
+      </div>
+    </aside>
+  </section>
+{% endblock %}

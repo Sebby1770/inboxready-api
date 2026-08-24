@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Pricing</p>
+      <h1>Pay for audit volume, not per seat</h1>
+      <p>
+        Every plan includes the whole API — all seven checks, batch, compare, reports, and
+        history. The difference is how many audits you run and how fast we answer.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/app" data-cta="pricing-primary">Try before you buy</a>
+        <a class="button button-secondary button-large" href="/contact?topic=Pricing+or+plans">Ask about volume</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section pricing-section">
+    <div class="pricing-grid">
+      {% for tier in pricing_tiers %}
+        <article class="price-card {% if tier.featured %}featured{% endif %}" data-reveal>
+          <div>
+            <p class="card-kicker">{{ "Most balanced" if tier.featured else "Plan" }}</p>
+            <h2>{{ tier.name }}</h2>
+            <p class="price-line">{{ tier.price }}<span>{{ tier.period }}</span></p>
+            <p class="price-description">{{ tier.description }}</p>
+          </div>
+          <ul class="card-points">
+            {% for feature in tier.features %}
+              <li>{{ feature }}</li>
+            {% endfor %}
+          </ul>
+          <a class="button {% if not tier.featured %}button-secondary{% endif %}"
+             href="/contact?topic=Pricing+or+plans" data-cta="plan-{{ tier.name|lower }}">{{ tier.cta }}</a>
+        </article>
+      {% endfor %}
+    </div>
+
+    <div class="pricing-notes panel" data-reveal>
+      <h2>What is the same on every plan</h2>
+      <ul class="card-points">
+        <li>All seven protocol checks, provider detection, and the weighted score</li>
+        <li>Batch audits, side-by-side compare, markdown and HTML reports, CSV history export</li>
+        <li>Per-key rate limiting and response caching you control</li>
+        <li>{{ promise.headline }} on support enquiries, {{ promise.business_days }}</li>
+      </ul>
+      <p>
+        Overages are billed rather than hard-stopped. An audit usually fires while a customer
+        is mid-activation, and a 402 at that moment costs you more than the overage does.
+        <a href="/faq">More answers on the FAQ</a>.
+      </p>
+    </div>
+  </section>
+
+  <section class="section faq-section">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Before you commit</p>
+      <h2>Questions that come up at this point</h2>
+    </div>
+    <div class="faq-list">
+      {% for faq in featured_faqs %}
+        <details class="faq-item panel" data-reveal>
+          <summary><span>{{ faq.question }}</span><span class="faq-category">{{ faq.category }}</span></summary>
+          <p>{{ faq.answer }}</p>
+        </details>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

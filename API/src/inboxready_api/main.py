@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import dns.resolver
 from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from inboxready_api import __version__
 from inboxready_api.cache import audit_cache, make_audit_cache_key
+from inboxready_api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 from inboxready_api.models import (
     BatchAuditRequest,
     BatchAuditResponse,
@@ -24,27 +28,37 @@ from inboxready_api.security import require_api_access
 from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dns_audit import audit_domain, normalize_domain
+from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.provider_detection import get_provider_catalog
 from inboxready_api.services.report import render_html_report, render_markdown_report
-from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.scoring import scoring_document
-from inboxready_api.middleware import RequestIdMiddleware
 from inboxready_api.settings import get_settings
-from inboxready_api.site_content import (
-    FAQS,
-    FLOW_STEPS,
-    HERO_METRICS,
-    PRICING_TIERS,
-    SAMPLE_CURL,
-    SAMPLE_JS,
-    SIGNAL_STRIPS,
-    USE_CASES,
-)
+from inboxready_api.site import router as site_router
+from inboxready_api.site.leads import configure_leads
 
 BASE_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+#: Prefixes that must answer with JSON even when something goes wrong. Serving
+#: an HTML 404 to a client that asked for JSON is a debugging trap.
+API_PREFIXES = ("/v1", "/api", "/healthz", "/readyz", "/openapi.json", "/docs", "/redoc")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Configure the persistence-backed stores once, at process start."""
+    settings = get_settings()
+    configure_history(
+        max_entries=settings.history_max_entries,
+        path=settings.history_path or None,
+    )
+    configure_leads(
+        max_entries=settings.leads_max_entries,
+        path=settings.leads_path or None,
+    )
+    yield
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="InboxReady API",
     version=__version__,
     summary="Developer-first email domain readiness checks.",
@@ -55,33 +69,35 @@ app = FastAPI(
     ),
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIdMiddleware)
+app.include_router(site_router.router)
 
-@app.on_event("startup")
-def _startup_history() -> None:
-    settings = get_settings()
-    configure_history(
-        max_entries=settings.history_max_entries,
-        path=settings.history_path or None,
+
+
+
+def _wants_json(request: Request) -> bool:
+    if request.url.path.startswith(API_PREFIXES):
+        return True
+    accept = request.headers.get("accept", "")
+    return "application/json" in accept and "text/html" not in accept
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
+    """Serve the branded 404 page to browsers, JSON to API clients."""
+    if exc.status_code == 404 and not _wants_json(request):
+        return site_router.render_not_found(request)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=getattr(exc, "headers", None),
     )
 
 
-
-def build_template_context(request: Request, *, page_title: str, page_description: str) -> dict[str, object]:
-    return {
-        "request": request,
-        "page_title": page_title,
-        "page_description": page_description,
-        "hero_metrics": HERO_METRICS,
-        "signal_strips": SIGNAL_STRIPS,
-        "use_cases": USE_CASES,
-        "flow_steps": FLOW_STEPS,
-        "pricing_tiers": PRICING_TIERS,
-        "faqs": FAQS,
-        "sample_curl": SAMPLE_CURL,
-        "sample_js": SAMPLE_JS,
-        "provider_catalog": get_provider_catalog(),
-    }
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> Response:
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
 def _run_cached_audit(request: DomainAuditRequest) -> tuple[DomainAuditResponse, str]:
@@ -100,35 +116,6 @@ def _run_cached_audit(request: DomainAuditRequest) -> tuple[DomainAuditResponse,
     return result, "MISS"
 
 
-@app.get("/", response_class=HTMLResponse)
-def root(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context=build_template_context(
-            request,
-            page_title="Email Domain Readiness",
-            page_description=(
-                "Polished SaaS front door for InboxReady, an API that audits customer "
-                "email domain setup and returns actionable remediation guidance."
-            ),
-        ),
-    )
-
-
-@app.get("/app", response_class=HTMLResponse)
-def workspace(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request=request,
-        name="app.html",
-        context=build_template_context(
-            request,
-            page_title="Workspace",
-            page_description="Interactive InboxReady workspace for running live email-domain audits.",
-        ),
-    )
-
-
 @app.get("/api")
 def api_root() -> dict[str, object]:
     return {
@@ -138,6 +125,9 @@ def api_root() -> dict[str, object]:
         "workspace": "/app",
         "health": "/healthz",
         "ready": "/readyz",
+        "sitemap": "/sitemap.xml",
+        "robots": "/robots.txt",
+        "pages": "/site/pages",
     }
 
 

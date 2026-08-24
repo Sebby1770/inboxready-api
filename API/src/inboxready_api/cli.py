@@ -10,12 +10,11 @@ from inboxready_api.models import BatchAuditRequest, CompareRequest, DomainAudit
 from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dns_audit import audit_domain
+from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.provider_detection import get_provider_catalog
 from inboxready_api.services.report import render_html_report, render_markdown_report
-from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.scoring import scoring_document
 from inboxready_api.settings import Settings, get_settings
-
 
 EXIT_PASS = 0
 EXIT_FAIL = 1
@@ -96,10 +95,9 @@ def run_command(args: argparse.Namespace) -> int:
             settings,
         )
         fmt = resolve_format(args)
-        if fmt == "json":
-            output = result.model_dump_json(indent=2)
-        else:
-            output = format_compare_text(result)
+        output = (
+            result.model_dump_json(indent=2) if fmt == "json" else format_compare_text(result)
+        )
         write_output(output, getattr(args, "out", None))
         if any(item.overall_status == "fail" for item in result.domains):
             return EXIT_FAIL

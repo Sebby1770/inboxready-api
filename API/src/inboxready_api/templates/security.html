@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Legal</p>
+      <h1>Security and responsible disclosure</h1>
+      <p>Last updated {{ last_updated }}. What we do, and how to tell us when we got it wrong.</p>
+    </div>
+  </section>
+
+  <section class="section legal-body">
+    <article class="panel legal-panel" data-reveal>
+      <h2 id="surface">What an audit touches</h2>
+      <ul class="card-points">
+        <li>Public DNS records for the domain you submit: MX, TXT, and CNAME lookups.</li>
+        <li>
+          For MTA-STS and BIMI, an HTTPS fetch of a policy or asset the domain owner published
+          deliberately at a well-known location.
+        </li>
+        <li>Nothing else. No port scanning, no SMTP connection, no mail delivery.</li>
+      </ul>
+
+      <h2 id="controls">Controls in the service</h2>
+      <ul class="card-points">
+        <li>Optional API keys, required on every <code>/v1</code> route once configured.</li>
+        <li>Sliding-window rate limiting per key, falling back to per-IP when unauthenticated.</li>
+        <li>Bounded outbound HTTP timeouts, so a slow third-party policy file cannot pin a worker.</li>
+        <li>
+          A content security policy on every HTML page, plus <code>nosniff</code>,
+          <code>X-Frame-Options: DENY</code>, a strict referrer policy, and HSTS over HTTPS.
+        </li>
+        <li>An <code>X-Request-Id</code> on every response so you can correlate a report with our logs.</li>
+      </ul>
+
+      <h2 id="disclosure">Reporting a vulnerability</h2>
+      <p>
+        Email <a href="mailto:{{ org.email }}">{{ org.email }}</a> with "security" in the
+        subject. Include what you found, how to reproduce it, and the
+        <code>X-Request-Id</code> if a specific response is involved.
+      </p>
+      <ul class="card-points">
+        <li>We acknowledge within one business day.</li>
+        <li>We will tell you our assessment and a fix timeline within five business days.</li>
+        <li>We will credit you when the fix ships, unless you would rather we did not.</li>
+        <li>We will not pursue you for good-faith research that respects the rules below.</li>
+      </ul>
+
+      <h2 id="rules">Rules for testing</h2>
+      <ul class="card-points">
+        <li>Test against your own domains and your own account.</li>
+        <li>No denial of service, no traffic floods, no social engineering of the team.</li>
+        <li>Stop at proof of concept — do not pivot, persist, or exfiltrate.</li>
+        <li>Give us a reasonable window before publishing.</li>
+      </ul>
+
+      <h2 id="self-hosting">Self-hosting checklist</h2>
+      <ul class="card-points">
+        <li>Set <code>INBOXREADY_API_KEYS</code> and keep <code>INBOXREADY_RATE_LIMIT_PER_MINUTE</code> non-zero.</li>
+        <li>Set <code>INBOXREADY_ENVIRONMENT=production</code> so crawlers are allowed and staging copies are not.</li>
+        <li>Set <code>INBOXREADY_SITE_BASE_URL</code> so canonical URLs and the sitemap point at the real origin.</li>
+        <li>Terminate TLS in front of the app; HSTS is emitted only on HTTPS requests.</li>
+      </ul>
+
+      <p>
+        Related: <a href="/privacy">privacy policy</a> · <a href="/terms">terms of service</a>.
+      </p>
+    </article>
+  </section>
+{% endblock %}

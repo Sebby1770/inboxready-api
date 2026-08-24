@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 from fastapi.testclient import TestClient
 
 from inboxready_api.cache import audit_cache, make_audit_cache_key
-from inboxready_api.cli import EXIT_FAIL, EXIT_PASS, main as cli_main, run_command
+from inboxready_api.cli import EXIT_FAIL, EXIT_PASS, run_command
+from inboxready_api.cli import main as cli_main
 from inboxready_api.main import app
 from inboxready_api.models import (
     AuditCheck,
@@ -19,7 +18,6 @@ from inboxready_api.services.dns_audit import audit_domain
 from inboxready_api.services.free_email import is_free_email_domain
 from inboxready_api.services.report import render_markdown_report
 from inboxready_api.settings import Settings, get_settings
-
 
 client = TestClient(app)
 

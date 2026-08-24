@@ -14,4 +14,19 @@ services:
       - key: INBOXREADY_HTTP_TIMEOUT_SECONDS
         value: 5.0
       - key: INBOXREADY_USER_AGENT
-        value: InboxReady/0.1 (+https://example.com)
+        value: InboxReady/0.5 (+https://github.com/Sebby1770/inboxready-api)
+      # Makes the site crawlable and marks pages index,follow. Anything other
+      # than "production" serves a blanket robots.txt disallow instead.
+      - key: INBOXREADY_ENVIRONMENT
+        value: production
+      # Required for correct canonical URLs, sitemap entries, and og:image.
+      - key: INBOXREADY_SITE_BASE_URL
+        sync: false
+      # Set to a G-XXXXXXXXXX measurement ID to enable consent-gated analytics.
+      - key: INBOXREADY_ANALYTICS_GA4_ID
+        sync: false
+      # Set these before taking real traffic.
+      - key: INBOXREADY_API_KEYS
+        sync: false
+      - key: INBOXREADY_RATE_LIMIT_PER_MINUTE
+        value: 60

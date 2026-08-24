@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Case studies</p>
+      <h1>Three places a domain audit earns its keep</h1>
+      <p>
+        Each one walks through the problem, the calls involved, and what changes once the
+        audit is in place.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/app" data-cta="cases-primary">Run an audit</a>
+        <a class="button button-secondary button-large" href="/contact">Talk through your case</a>
+      </div>
+      <p class="disclosure">
+        These are illustrative scenarios drawn from how the API is designed to be used. They
+        are not accounts of named customers, and nothing here is presented as a testimonial.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="case-grid">
+      {% for study in case_studies %}
+        <article class="panel case-card" data-reveal>
+          <p class="card-kicker">{{ study.segment }}</p>
+          <h2><a href="{{ study.path }}">{{ study.title }}</a></h2>
+          <p>{{ study.summary }}</p>
+          <ul class="metric-inline">
+            {% for metric in study.metrics %}
+              <li><strong>{{ metric.value|safe }}</strong> {{ metric.label }}</li>
+            {% endfor %}
+          </ul>
+          <a class="button button-secondary" href="{{ study.path }}">
+            Read the walkthrough
+          </a>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section cta-section" data-reveal>
+    <div class="cta-panel">
+      <div>
+        <h2>Your situation is probably one of these three</h2>
+        <p>
+          If it is not, we would genuinely like to hear it.
+          <strong>{{ promise.headline }}</strong>.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a class="button button-large" href="/contact">Describe your case</a>
+        <a class="button button-secondary button-large" href="/product">See what we check</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

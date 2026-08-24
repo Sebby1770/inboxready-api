@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Product</p>
+      <h1>Seven checks, one score, and the record you actually have to change</h1>
+      <p>
+        Every audit runs the same checks in the same order and returns them flat, so you can
+        drive a UI straight from the response instead of parsing prose.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/app" data-cta="product-primary">Run an audit now</a>
+        <a class="button button-secondary button-large" href="/docs">Open the API reference</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="checks-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">What we check</p>
+      <h2 id="checks-heading">Each check answers one question a customer can act on</h2>
+    </div>
+
+    <div class="check-reference-grid">
+      {% for check in checks %}
+        <article class="panel check-reference" id="check-{{ check.key }}" data-reveal>
+          <p class="card-kicker">{{ check.key|upper|replace('_', '-') }}</p>
+          <h3>{{ check.name }}</h3>
+          <p class="check-question">{{ check.question }}</p>
+          <p>{{ check.detail }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="score-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Scoring</p>
+      <h2 id="score-heading">The score is weighted, documented, and queryable</h2>
+      <p>
+        Weights are not a secret sauce. <code>GET /v1/scoring</code> returns them as JSON so
+        you can show a customer why their domain sits where it does.
+      </p>
+    </div>
+
+    <div class="code-grid">
+      <article class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">cURL</p>
+            <h3>Request an audit</h3>
+          </div>
+        </div>
+        <pre><code>{{ sample_curl }}</code></pre>
+      </article>
+      <article class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">JavaScript</p>
+            <h3>Gate a step on the result</h3>
+          </div>
+        </div>
+        <pre><code>{{ sample_js }}</code></pre>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="providers-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Provider detection</p>
+      <h2 id="providers-heading">We name the provider so your instructions can be specific</h2>
+      <p>
+        Fingerprints come from MX hosts, SPF includes, and DKIM selector conventions. Knowing
+        the provider is what turns "add a TXT record" into a screenshot they recognise.
+      </p>
+    </div>
+    <ul class="provider-chip-list">
+      {% for provider in provider_catalog %}
+        <li class="provider-chip">{{ provider.name }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="section cta-section" data-reveal>
+    <div class="cta-panel">
+      <div>
+        <h2>See it against a real domain</h2>
+        <p>
+          Or read how other teams use it in the
+          <a href="/case-studies">case studies</a>, and what it costs on the
+          <a href="/pricing">pricing page</a>.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a class="button button-large" href="/app" data-cta="product-footer">Open workspace</a>
+        <a class="button button-secondary button-large" href="/contact">Ask a question</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

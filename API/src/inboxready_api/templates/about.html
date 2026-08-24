@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">About</p>
+      <h1>A deliberately small answer to a deliberately specific problem</h1>
+      <p>
+        InboxReady exists because "add these DNS records" is the step where self-serve
+        onboarding quietly dies. Everything else we could build sits behind that.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/contact" data-cta="about-primary">Talk to us</a>
+        <a class="button button-secondary button-large" href="/case-studies">See how it is used</a>
+      </div>
+    </div>
+  </section>
+
+  {# 20 — team photo. Placeholders are labelled, and excluded from Person schema. #}
+  <section class="section" aria-labelledby="team-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">The team</p>
+      <h2 id="team-heading">Who you actually deal with</h2>
+      <p>
+        Small enough that the person who answers your email is the person who wrote the check
+        you are asking about.
+      </p>
+    </div>
+
+    <figure class="team-photo panel" data-reveal>
+      <img
+        src="{{ url_for('static', path=team_photo.src) }}"
+        alt="{{ team_photo.alt }}"
+        width="1200"
+        height="600"
+        loading="lazy"
+        decoding="async"
+      >
+      <figcaption>
+        {% if team_photo.placeholder %}<span class="placeholder-badge">Placeholder</span>{% endif %}
+        {{ team_photo.caption }}
+      </figcaption>
+    </figure>
+
+    <div class="team-grid">
+      {% for member in team %}
+        <article class="team-card panel" data-reveal>
+          <img
+            class="team-portrait"
+            src="{{ url_for('static', path=member.photo) }}"
+            alt="{{ member.photo_alt }}"
+            width="160"
+            height="160"
+            loading="lazy"
+            decoding="async"
+          >
+          <h3>
+            {{ member.name }}
+            {% if member.placeholder %}<span class="placeholder-badge">Placeholder</span>{% endif %}
+          </h3>
+          <p class="team-role">{{ member.role }}</p>
+          <p>{{ member.bio }}</p>
+          {% if member.profile_url %}
+            <a class="text-link" href="{{ member.profile_url }}" rel="noopener external" target="_blank">Profile</a>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="principles-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">How we work</p>
+      <h2 id="principles-heading">Three commitments we will not quietly drop</h2>
+    </div>
+    <div class="trust-grid">
+      <article class="panel trust-card" data-reveal>
+        <h3>The scoring is inspectable</h3>
+        <p>
+          Weights are published at <code>GET /v1/scoring</code> and the source is readable.
+          A score you cannot explain to a customer is worse than no score.
+        </p>
+        <a class="text-link" href="{{ org.repository }}" rel="noopener external" target="_blank">Read the source</a>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3>Your customers' DNS stays yours</h3>
+        <p>
+          Audits run in-process and history is opt-in. We do not build a dataset out of the
+          domains you look up.
+        </p>
+        <a class="text-link" href="/privacy">Read the privacy policy</a>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3>We answer within a business day</h3>
+        <p>
+          {{ promise.headline }}, {{ promise.business_days }}. {{ promise.escalation }}
+        </p>
+        <a class="text-link" href="/contact">Contact and directions</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="section cta-section" data-reveal>
+    <div class="cta-panel">
+      <div>
+        <h2>Based in {{ org.address.locality }}, working with teams anywhere</h2>
+        <p>{{ org.service_area }} <a href="/contact">Find us, or just send an email</a>.</p>
+      </div>
+      <div class="cta-actions">
+        <a class="button button-large" href="/contact">Get in touch</a>
+        <a class="button button-secondary button-large" href="/app">Run an audit</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}
