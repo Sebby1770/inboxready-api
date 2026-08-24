@@ -1,0 +1,66 @@
+name: Publish site
+
+# The marketing site is a pure function of the page registry, so it can be
+# rendered once and served as files. This builds it and force-pushes the result
+# to `gh-pages`, which is the single publisher for the Pages site — no second
+# deploy path that could race with it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "API/src/inboxready_api/**"
+      - "API/scripts/build_static.py"
+      - "API/pyproject.toml"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "Origin of a running InboxReady API, to make the audit form live"
+        required: false
+        default: ""
+
+concurrency:
+  group: publish-site
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install package
+        working-directory: API
+        run: pip install -e "."
+
+      - name: Build the static site
+        working-directory: API
+        run: |
+          python scripts/build_static.py \
+            --out "${{ runner.temp }}/site" \
+            --base-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}" \
+            --api-base "${{ github.event.inputs.api_base }}"
+
+      - name: Check every internal link resolves
+        run: python .github/scripts/check_links.py "${{ runner.temp }}/site"
+
+      - name: Publish to gh-pages
+        run: |
+          cd "${{ runner.temp }}/site"
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish site from ${GITHUB_SHA::7}"
+          git push -q --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            gh-pages

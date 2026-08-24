@@ -15,3 +15,6 @@ build/
 
 API/.venv/
 API/src/*.egg-info/
+
+# Static site build output (published from CI, never committed)
+_site/

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {# 01 — custom error page: wayfinding, not an apology. #}
+  <section class="section page-hero error-page above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Error {{ error_code }}</p>
+      <h1>{{ error_title }}</h1>
+      <p>{{ error_body }}</p>
+      {% if attempted_path %}
+        <p class="attempted-path"><code>{{ attempted_path }}</code></p>
+      {% endif %}
+      <div class="hero-actions">
+        <a class="button button-large" href="/" data-cta="error-home">Back to the home page</a>
+        <a class="button button-secondary button-large" href="/app" data-cta="error-workspace">Run a domain audit</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="error-links-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Popular destinations</p>
+      <h2 id="error-links-heading">What people usually came here for</h2>
+    </div>
+    <div class="trust-grid">
+      <article class="panel trust-card" data-reveal>
+        <h3><a href="/product">What InboxReady checks</a></h3>
+        <p>The seven protocol checks and how the weighted score is built.</p>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3><a href="/app">Live workspace</a></h3>
+        <p>Audit a domain in the browser and inspect the raw JSON.</p>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3><a href="/pricing">Pricing</a></h3>
+        <p>Three plans, monthly audit allowances, and how overage is handled.</p>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3><a href="{{ docs_url }}">API documentation</a></h3>
+        <p>Every endpoint, request body, and response schema.</p>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3><a href="/case-studies">Case studies</a></h3>
+        <p>Onboarding, support triage, and portfolio monitoring, worked through.</p>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3><a href="/contact">Contact us</a></h3>
+        <p>If the page really should exist, tell us — {{ promise.headline|lower }}.</p>
+      </article>
+    </div>
+  </section>
+{% endblock %}

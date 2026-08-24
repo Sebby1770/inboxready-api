@@ -3,12 +3,10 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from inboxready_api.main import app
-from inboxready_api.middleware import RequestIdMiddleware
+from inboxready_api.models import AuditCheck, DomainAuditResponse
 from inboxready_api.services.history import HistoryStore, configure_history, get_history
 from inboxready_api.services.report import render_html_report
 from inboxready_api.services.scoring import scoring_document
-from inboxready_api.models import AuditCheck, DomainAuditResponse
-
 
 client = TestClient(app)
 

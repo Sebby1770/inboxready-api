@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {# 18 — privacy policy page. #}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Legal</p>
+      <h1>Privacy policy</h1>
+      <p>Last updated {{ last_updated }}. Written to be read, not to be survived.</p>
+    </div>
+  </section>
+
+  <section class="section legal-body">
+    <article class="panel legal-panel" data-reveal>
+      <h2 id="summary">The short version</h2>
+      <ul class="card-points">
+        <li>Auditing a domain queries public DNS. We do not need, and do not ask for, mailbox access.</li>
+        <li>Audit results are not retained by default. History is opt-in and stays on your instance.</li>
+        <li>The contact form is used to reply to you. It is not fed into a marketing list.</li>
+        <li>Analytics is off unless a measurement ID is configured, and then only after you consent.</li>
+      </ul>
+
+      <h2 id="controller">Who is responsible</h2>
+      <p>
+        {{ org.legal_name }}, {{ org.address.single_line }}, is the controller for personal data
+        described here. Reach us at <a href="mailto:{{ org.email }}">{{ org.email }}</a>.
+      </p>
+
+      <h2 id="what-we-collect">What we collect, and why</h2>
+      <h3>When you use the API or the workspace</h3>
+      <ul class="card-points">
+        <li>
+          <strong>The domain you audit.</strong> A domain name is not usually personal data, but
+          it can be (a sole trader's surname, for example). It is processed to run the checks
+          and is discarded when the response is returned, unless history persistence is
+          enabled on the instance you are calling.
+        </li>
+        <li>
+          <strong>Your IP address.</strong> Held transiently in memory for rate limiting. It is
+          not written to disk by the application and is not used to profile you.
+        </li>
+        <li>
+          <strong>Your API key, if you send one.</strong> Used to authenticate the call and to
+          bucket rate limits.
+        </li>
+      </ul>
+
+      <h3>When you contact us</h3>
+      <ul class="card-points">
+        <li>Your name, email address, optional company, chosen topic, and message.</li>
+        <li>Used solely to answer you and to keep a record of the conversation.</li>
+      </ul>
+
+      <h3>When you browse the site</h3>
+      <ul class="card-points">
+        <li>
+          Analytics runs only if a Google Analytics 4 measurement ID is configured for the
+          deployment. Where consent is required, no analytics cookie is set and no event is
+          sent until you accept the banner. Declining is remembered, and re-declining later
+          clears the choice.
+        </li>
+        <li>
+          One first-party item is stored in your browser regardless: the list of domains you
+          recently audited, kept in <code>localStorage</code> so the workspace can offer them
+          back to you. It never leaves your device and clearing site data removes it.
+        </li>
+      </ul>
+
+      <h2 id="lawful-basis">Lawful basis (UK/EU GDPR)</h2>
+      <ul class="card-points">
+        <li><strong>Contract</strong> — providing the API you or your employer signed up for.</li>
+        <li><strong>Legitimate interests</strong> — rate limiting and abuse prevention, balanced against the minimal, transient data involved.</li>
+        <li><strong>Consent</strong> — analytics cookies, and nothing else.</li>
+      </ul>
+
+      <h2 id="retention">How long we keep things</h2>
+      <ul class="card-points">
+        <li>Audit responses: not retained, unless the operator of the instance enables history.</li>
+        <li>Rate-limit counters: a rolling 60-second window, in memory only.</li>
+        <li>Contact messages: kept while the conversation is useful, then deleted on request.</li>
+        <li>Analytics: whatever retention the account is configured for, capped at 14 months.</li>
+      </ul>
+
+      <h2 id="sharing">Who else sees it</h2>
+      <p>
+        Google Analytics, if enabled and consented to. The hosting provider running the
+        instance. Nobody else — there is no data broker, no enrichment service, and no
+        advertising pixel on this site.
+      </p>
+
+      <h2 id="rights">Your rights</h2>
+      <p>
+        Access, correction, erasure, restriction, portability, and objection. Email
+        <a href="mailto:{{ org.email }}">{{ org.email }}</a> and we will action it within 30
+        days. Australian users may also complain to the OAIC; EU and UK users to their local
+        supervisory authority.
+      </p>
+
+      <h2 id="self-hosting">If you self-host</h2>
+      <p>
+        This project is source-available. When you run your own instance, you are the
+        controller for everything it processes, and this policy describes the software's
+        behaviour rather than your obligations.
+        <a href="/security">Our security page</a> covers the technical side.
+      </p>
+
+      <h2 id="changes">Changes</h2>
+      <p>
+        Material changes will be dated at the top of this page. The
+        <a href="{{ org.repository }}" rel="noopener external" target="_blank">repository history</a>
+        is the audit trail.
+      </p>
+    </article>
+  </section>
+{% endblock %}

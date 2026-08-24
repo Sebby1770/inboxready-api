@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">FAQ</p>
+      <h1>Questions people ask before they integrate</h1>
+      <p>
+        Grouped by what you are trying to decide. If yours is missing,
+        <a href="/contact">ask it</a> — {{ promise.headline|lower }}.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/app" data-cta="faq-primary">Run an audit</a>
+        <a class="button button-secondary button-large" href="/contact">Ask something else</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section faq-section">
+    <div class="faq-list wide">
+      {% for faq in faqs %}
+        <details class="faq-item panel" data-reveal {% if loop.first %}open{% endif %}>
+          <summary><span>{{ faq.question }}</span><span class="faq-category">{{ faq.category }}</span></summary>
+          <p>{{ faq.answer }}</p>
+        </details>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section cta-section" data-reveal>
+    <div class="cta-panel">
+      <div>
+        <h2>Still deciding?</h2>
+        <p>
+          The <a href="/case-studies">case studies</a> show the three shapes this usually takes,
+          and <a href="/product">the product page</a> lists every check in detail.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a class="button button-large" href="/app">Open workspace</a>
+        <a class="button button-secondary button-large" href="/pricing">See pricing</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

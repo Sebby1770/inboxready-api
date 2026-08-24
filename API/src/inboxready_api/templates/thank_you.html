@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {# 04 — thank-you page. A real destination, so the conversion is measurable. #}
+  <section class="section page-hero above-the-fold" data-conversion="contact">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Message received</p>
+      <h1>Thanks — that landed</h1>
+      <p class="promise-banner">
+        <strong>{{ promise.headline }}.</strong>
+        {{ promise.business_days }}. If it is urgent and looks like an outage, say so in a
+        reply and it jumps the queue.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/app" data-cta="thanks-primary">Run an audit while you wait</a>
+        <a class="button button-secondary button-large" href="/case-studies">Read a walkthrough</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="next-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">While you wait</p>
+      <h2 id="next-heading">Three things that often answer the question first</h2>
+    </div>
+    <div class="trust-grid">
+      <article class="panel trust-card" data-reveal>
+        <h3>Audit the domain yourself</h3>
+        <p>The workspace runs the same API we would run for you, and shows the raw JSON.</p>
+        <a class="text-link" href="/app">Open the workspace</a>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        <h3>Check the FAQ</h3>
+        <p>Integration effort, data retention, overage behaviour, and what the audit touches.</p>
+        <a class="text-link" href="/faq">Read the FAQ</a>
+      </article>
+      <article class="panel trust-card" data-reveal>
+        {% if static_build %}
+          <h3>Read the source</h3>
+          <p>Every check, weight, and remediation string is public and readable.</p>
+          <a class="text-link" href="{{ repository_url }}" rel="noopener external" target="_blank">Open the repository</a>
+        {% else %}
+          <h3>Confirm the service is healthy</h3>
+          <p>Liveness and readiness probes answer instantly, with no login.</p>
+          <a class="text-link" href="/healthz">Open /healthz</a>
+        {% endif %}
+      </article>
+    </div>
+  </section>
+{% endblock %}

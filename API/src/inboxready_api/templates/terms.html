@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Legal</p>
+      <h1>Terms of service</h1>
+      <p>Last updated {{ last_updated }}. These terms cover the hosted InboxReady API.</p>
+    </div>
+  </section>
+
+  <section class="section legal-body">
+    <article class="panel legal-panel" data-reveal>
+      <h2 id="service">The service</h2>
+      <p>
+        InboxReady runs public DNS lookups against domains you submit and returns a scored
+        assessment of their email authentication posture. It is diagnostic. It does not send
+        mail, modify your DNS, or guarantee inbox placement.
+      </p>
+
+      <h2 id="acceptable-use">Acceptable use</h2>
+      <ul class="card-points">
+        <li>Audit domains you own, operate, or have been asked to help with.</li>
+        <li>Do not use the API to enumerate third-party infrastructure at scale for targeting.</li>
+        <li>Do not attempt to circumvent rate limits with rotating keys or addresses.</li>
+        <li>Do not resell raw API access as if it were your own service without agreement.</li>
+      </ul>
+      <p>We may suspend a key that is doing any of the above, and we will tell you why.</p>
+
+      <h2 id="plans">Plans, volume, and overage</h2>
+      <ul class="card-points">
+        <li>Each plan includes a monthly audit allowance; the full feature set is on every plan.</li>
+        <li>Exceeding the allowance bills overage at the plan's rate rather than hard-stopping calls.</li>
+        <li>Plans are month to month. Cancel and the current period runs out; we do not pro-rate.</li>
+        <li>Prices are in USD and exclude any tax that applies where you are.</li>
+      </ul>
+
+      <h2 id="availability">Availability</h2>
+      <p>
+        We aim for continuous availability and publish
+        {% if static_build %}liveness and readiness probes{% else %}<a href="/healthz">liveness</a>
+        and <a href="/readyz">readiness</a> probes{% endif %} so you can verify it yourself. Audits depend on public DNS and on policy files published by third
+        parties; when those are slow or unreachable, a check returns a warning rather than a
+        false pass. No uptime figure is contractually promised on the self-serve plans.
+      </p>
+
+      <h2 id="your-data">Your data</h2>
+      <p>
+        Covered by the <a href="/privacy">privacy policy</a>. In short: audit inputs are not
+        retained by default, and we do not build a product out of the domains you look up.
+      </p>
+
+      <h2 id="liability">Liability</h2>
+      <p>
+        The service is provided as-is. A passing score means the checks we run found nothing
+        wrong at that moment; it is not a warranty that mail will be delivered. To the extent
+        the law allows, our aggregate liability is limited to the fees you paid in the three
+        months before the claim. Nothing here excludes liability that cannot lawfully be
+        excluded, including under the Australian Consumer Law.
+      </p>
+
+      <h2 id="source">Source code</h2>
+      <p>
+        The implementation is published under the MIT licence in the
+        <a href="{{ org.repository }}" rel="noopener external" target="_blank">project repository</a>.
+        Those terms govern the code; these terms govern the hosted service.
+      </p>
+
+      <h2 id="contact">Questions</h2>
+      <p>
+        <a href="/contact">Ask us</a> — {{ promise.headline|lower }}.
+      </p>
+    </article>
+  </section>
+{% endblock %}

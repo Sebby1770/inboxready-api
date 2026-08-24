@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <article class="section case-detail above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">{{ study.segment }}</p>
+      <h1>{{ study.title }}</h1>
+      <p>{{ study.summary }}</p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/app" data-cta="case-primary">Try this on your domain</a>
+        <a class="button button-secondary button-large" href="/contact">Ask how it would fit</a>
+      </div>
+      {% if study.illustrative %}
+        <p class="disclosure">
+          Illustrative scenario — a composite of how the API is designed to be used, not an
+          account of a named customer.
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="case-body">
+      <section class="panel" data-reveal>
+        <h2>The problem</h2>
+        <p>{{ study.challenge }}</p>
+      </section>
+
+      <section class="panel" data-reveal>
+        <h2>How the audit is wired in</h2>
+        <ol class="numbered-list">
+          {% for step in study.approach %}
+            <li>{{ step }}</li>
+          {% endfor %}
+        </ol>
+      </section>
+
+      <section class="panel" data-reveal>
+        <h2>What changes</h2>
+        <p>{{ study.outcome }}</p>
+        <ul class="metric-inline large">
+          {% for metric in study.metrics %}
+            <li><strong>{{ metric.value|safe }}</strong> {{ metric.label }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">The call</p>
+            <h2>Integration sketch</h2>
+          </div>
+        </div>
+        <pre><code>{{ study.integration }}</code></pre>
+      </section>
+    </div>
+  </article>
+
+  <section class="section" aria-labelledby="related-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Keep reading</p>
+      <h2 id="related-heading">Related walkthroughs</h2>
+    </div>
+    <div class="case-teaser-grid">
+      {% for other in other_studies %}
+        <article class="case-teaser panel" data-reveal>
+          <p class="card-kicker">{{ other.segment }}</p>
+          <h3><a href="{{ other.path }}">{{ other.title }}</a></h3>
+          <p>{{ other.summary }}</p>
+        </article>
+      {% endfor %}
+      <article class="case-teaser panel" data-reveal>
+        <p class="card-kicker">Reference</p>
+        <h3><a href="/product">Every check, in detail</a></h3>
+        <p>What each of the seven checks looks for, and how the weighted score is built.</p>
+      </article>
+    </div>
+  </section>
+{% endblock %}

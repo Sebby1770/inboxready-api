@@ -3,29 +3,98 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ page_title }} · InboxReady</title>
+
+    {# 11 — unique page titles, 12 — unique meta descriptions. Both come from the page registry. #}
+    <title>{{ page_title }} · {{ org.name }}</title>
     <meta name="description" content="{{ page_description }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta name="robots" content="{{ robots_content }}">
+    <meta name="author" content="{{ org.legal_name }}">
+    <meta name="theme-color" content="#d95c43">
+    <meta name="color-scheme" content="light">
+
+    {# 13 — social share image, as Open Graph and Twitter card metadata. #}
+    {% for property, value in social_meta.items() %}
+      <meta {% if property.startswith('twitter:') %}name{% else %}property{% endif %}="{{ property }}" content="{{ value }}">
+    {% endfor %}
+
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='img/favicon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', path='img/favicon.svg') }}">
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml">
     <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+    {% block head_extra %}{% endblock %}
+
+    {# Reveal animations must never be able to hide content from a visitor. #}
+    <noscript>
+      <style>
+        [data-reveal], .panel, .hero-copy, .hero-panel, .price-card,
+        .step-card, .metric-card, .cta-panel, .use-case-card {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      </style>
+    </noscript>
+
+    {# 17 — Organization, ProfessionalService (local), WebSite, BreadcrumbList, FAQPage. #}
+    <script type="application/ld+json">{{ json_ld|safe }}</script>
+
+    <script defer src="{{ url_for('static', path='js/site.js') }}"></script>
     <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
+    {% block body_scripts %}{% endblock %}
+    {# 19 — Google Analytics 4, loaded from an external file so the CSP stays script-src 'self'. #}
+    {% if analytics_id %}
+      <script
+        defer
+        src="{{ url_for('static', path='js/analytics.js') }}"
+        data-ga4-id="{{ analytics_id }}"
+        data-require-consent="{{ 'true' if analytics_require_consent else 'false' }}"
+      ></script>
+    {% endif %}
   </head>
-  <body class="{{ body_class|default('') }}">
+  <body
+    class="{{ body_class|default('') }}"
+    data-page="{{ page.path }}"
+    data-api-base="{{ api_base_url }}"
+    data-static-build="{{ 'true' if static_build else 'false' }}"
+  >
+    <a class="skip-link" href="#main">Skip to main content</a>
+
     <div class="site-shell">
       <header class="site-header">
-        <a class="brand" href="/">
-          <span class="brand-mark">IR</span>
+        <a class="brand" href="/" aria-label="{{ org.name }} home">
+          <img
+            class="brand-mark-img"
+            src="{{ url_for('static', path='img/favicon.svg') }}"
+            width="44"
+            height="44"
+            alt="{{ org.name }} logo: an envelope inside a rounded gradient tile"
+          >
           <span class="brand-copy">
-            <strong>InboxReady</strong>
-            <span>Domain readiness for sender-facing SaaS</span>
+            <strong>{{ org.name }}</strong>
+            <span>{{ org.tagline }}</span>
           </span>
         </a>
 
-        <nav class="site-nav" aria-label="Primary">
-          <a href="/#product">Product</a>
-          <a href="/#workflow">Workflow</a>
-          <a href="/#pricing">Pricing</a>
-          <a href="/#faq">FAQ</a>
-          <a href="/docs">API Docs</a>
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="primary-navigation"
+          data-nav-toggle
+        >
+          <span class="nav-toggle-bars" aria-hidden="true"></span>
+          <span class="nav-toggle-label">Menu</span>
+        </button>
+
+        {# 03 — internal links: one registry drives header, footer, and sitemap. #}
+        <nav class="site-nav" id="primary-navigation" aria-label="Primary">
+          {% for nav_page in primary_nav %}
+            <a
+              href="{{ nav_page.path }}"
+              {% if nav_page.path == page.path %}aria-current="page"{% endif %}
+            >{{ nav_page.nav_label }}</a>
+          {% endfor %}
+          <a href="{{ docs_url }}">API docs</a>
         </nav>
 
         <div class="header-actions">
@@ -33,42 +102,116 @@
             <span class="status-dot"></span>
             Checking API
           </span>
-          <a class="button button-secondary" href="/app">Open Workspace</a>
+          <a class="button button-secondary" href="/app" data-cta="header">Open workspace</a>
         </div>
       </header>
 
-      <main>
+      {# 05 — breadcrumbs, mirrored by BreadcrumbList structured data in the head. #}
+      {% if breadcrumb_trail %}
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <ol>
+            {% for crumb in breadcrumb_trail %}
+              <li>
+                {% if loop.last %}
+                  <span aria-current="page">{{ crumb.breadcrumb_label }}</span>
+                {% else %}
+                  <a href="{{ crumb.path }}">{{ crumb.breadcrumb_label }}</a>
+                  <span class="crumb-sep" aria-hidden="true">/</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ol>
+        </nav>
+      {% endif %}
+
+      <main id="main">
         {% block content %}{% endblock %}
       </main>
 
       <footer class="site-footer">
         <div class="footer-grid">
-          <div>
+          <div class="footer-about">
             <div class="footer-brand">
-              <span class="brand-mark">IR</span>
-              <strong>InboxReady</strong>
+              <img
+                class="brand-mark-img"
+                src="{{ url_for('static', path='img/favicon.svg') }}"
+                width="36"
+                height="36"
+                alt=""
+                aria-hidden="true"
+              >
+              <strong>{{ org.name }}</strong>
             </div>
-            <p>
-              A focused API for auditing customer email domain posture before support
-              queues and deliverability issues get expensive.
+            <p>{{ org.description }}</p>
+
+            {# 08 — response time promise, repeated where people decide to write in. #}
+            <p class="footer-promise">
+              <strong>{{ promise.headline }}.</strong>
+              {{ promise.business_days }}.
             </p>
+
+            {# 14 — location and directions. #}
+            <address class="footer-address">
+              {{ org.address.single_line }}<br>
+              <a href="mailto:{{ org.email }}">{{ org.email }}</a> ·
+              <a href="{{ directions_url }}" rel="noopener external" target="_blank">Get directions</a>
+            </address>
           </div>
 
-          <div>
-            <h3>Product</h3>
-            <a href="/#product">Capabilities</a>
-            <a href="/#workflow">Workflow</a>
-            <a href="/app">Workspace</a>
-          </div>
+          {% for column, links in footer_nav.items() %}
+            <div class="footer-column">
+              <h2>{{ column }}</h2>
+              {% for link in links %}
+                <a href="{{ link.path }}">{{ link.nav_label }}</a>
+              {% endfor %}
+              {% if column == 'Product' %}
+                <a href="{{ docs_url }}">OpenAPI docs</a>
+                {% if static_build %}
+                  <a href="{{ repository_url }}" rel="noopener external" target="_blank">Source on GitHub</a>
+                {% else %}
+                  <a href="/healthz">Health check</a>
+                {% endif %}
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
 
-          <div>
-            <h3>Developers</h3>
-            <a href="/docs">OpenAPI Docs</a>
-            <a href="/api">API Metadata</a>
-            <a href="/healthz">Health Check</a>
-          </div>
+        <div class="footer-base">
+          <p>&copy; {{ current_year }} {{ org.legal_name }}. API version {{ version }}.</p>
+          <p>
+            <a href="/sitemap.xml">Sitemap</a> ·
+            <a href="/robots.txt">robots.txt</a> ·
+            <a href="/privacy">Privacy</a> ·
+            <a href="/terms">Terms</a>
+          </p>
         </div>
       </footer>
     </div>
+
+    {# 09 — sticky mobile CTA. Hidden on desktop, dismissible, never covers the footer CTA. #}
+    <div class="sticky-cta" data-sticky-cta hidden>
+      <div class="sticky-cta-copy">
+        <strong>Audit a domain now</strong>
+        <span>{{ promise.headline }} if you get stuck.</span>
+      </div>
+      <a class="button" href="/app" data-cta="sticky-mobile">Run a free audit</a>
+      <button class="sticky-cta-dismiss" type="button" data-sticky-dismiss aria-label="Dismiss this banner">
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+
+    {% if analytics_id and analytics_require_consent %}
+      <div class="consent-banner" role="dialog" aria-live="polite" aria-label="Cookie consent" data-consent-banner hidden>
+        <p>
+          We use Google Analytics to see which pages help people ship. Nothing is stored
+          until you say yes, and audits are never tracked. See our
+          <a href="/privacy">privacy policy</a>.
+        </p>
+        <div class="consent-actions">
+          <button class="button button-secondary" type="button" data-consent="denied">Decline</button>
+          <button class="button" type="button" data-consent="granted">Accept</button>
+        </div>
+      </div>
+    {% endif %}
   </body>
 </html>

@@ -1,82 +1,272 @@
 {% extends "base.html" %}
 
+{% block head_extra %}
+  <link rel="stylesheet" href="{{ url_for('static', path='css/home.css') }}">
+{% endblock %}
+
+{% block body_scripts %}
+  <script defer src="{{ url_for('static', path='js/home.js') }}"></script>
+{% endblock %}
+
 {% block content %}
-  <section class="hero-section section">
-    <div class="hero-copy" data-reveal>
-      <div class="eyebrow-pill">Email authentication, without the support backlog</div>
-      <h1>Audit customer sending domains like a polished SaaS, not a bundle of DNS scripts.</h1>
-      <p class="hero-lead">
-        InboxReady is a developer-first API and workflow surface for checking MX, SPF, DKIM,
-        DMARC, BIMI, MTA-STS, and TLS-RPT in one response. It is built for products that
-        need customer domains to work reliably before email volume grows.
-      </p>
+  {#
+    02 — CTA above the fold. The primary action is the first interactive element
+    inside <main>, ahead of any section heading, and the hero is sized to land
+    it above the fold on a 667px-tall phone.
+  #}
+  <section class="hero-stage above-the-fold">
+    <div class="airmail-rule" aria-hidden="true"></div>
 
-      <div class="hero-actions">
-        <a class="button" href="/app">Run Live Domain Audit</a>
-        <a class="button button-secondary" href="/docs">Browse API Docs</a>
+    <pre class="hero-ghost" aria-hidden="true">
+example.com.        300  IN  MX     10 aspmx.l.google.com.
+example.com.        300  IN  TXT    "v=spf1 include:_spf.google.com ~all"
+_dmarc.example.com. 300  IN  TXT    "v=DMARC1; p=none; rua=mailto:..."
+google._domainkey.  300  IN  TXT    "v=DKIM1; k=rsa; p=MIIBIjANBg..."
+_mta-sts.example.com. 300 IN TXT    "v=STSv1; id=20260824T000000;"
+_smtp._tls.example.com.  IN  TXT    "v=TLSRPTv1; rua=mailto:..."
+default._bimi.example.com.  IN TXT  "v=BIMI1; l=https://.../logo.svg"
+    </pre>
+
+    <div class="hero-inner">
+      <div class="hero-copy" data-reveal>
+        <p class="eyebrow-terminal">
+          <span class="prompt">$</span>
+          <span>inboxready audit --live</span>
+          <span class="caret" aria-hidden="true"></span>
+        </p>
+
+        <h1 class="hero-title">
+          Know their sending domain is ready
+          <span class="marked">
+            before they hit send.
+            <svg class="hero-underline" viewBox="0 0 420 22" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+              <path d="M4 15C70 6 150 4 214 8c60 4 130 6 202 2" pathLength="1" />
+            </svg>
+          </span>
+        </h1>
+
+        <p class="hero-lead">
+          One call checks MX, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and BIMI, then hands back a
+          weighted score and the exact DNS records to fix. Built for products whose customers
+          send from their own domain.
+        </p>
+
+        <div class="hero-actions">
+          <a class="button button-large" href="/app" data-cta="hero-primary">Run a free domain audit</a>
+          <a class="button button-ghost button-large" href="/product" data-cta="hero-secondary">See what it checks</a>
+        </div>
+
+        <p class="hero-reassurance">
+          No signup for the live workspace · <a href="/pricing">Plans from $49/month</a> ·
+          {{ promise.headline }}
+        </p>
       </div>
 
-      <div class="signal-strip">
-        {% for item in signal_strips %}
-          <span>{{ item }}</span>
-        {% endfor %}
-      </div>
+      {# The live console: a demo trace plays until the visitor runs a real audit. #}
+      <div class="console-panel" data-reveal>
+        <div class="console-bar">
+          <span class="console-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="console-name">inboxready — live audit</span>
+          <span class="console-badge">Interactive</span>
+        </div>
 
-      <div class="metric-grid">
-        {% for metric in hero_metrics %}
-          <article class="metric-card" data-reveal>
-            <strong>{{ metric.value }}</strong>
-            <span>{{ metric.label }}</span>
-          </article>
-        {% endfor %}
+        <h2 class="visually-hidden">Run a live audit</h2>
+
+        <form
+          class="audit-form console-form"
+          data-audit-form
+          data-results-target="hero-results"
+          data-recent-target="hero-recents"
+        >
+          <label>
+            Root domain
+            <input name="domain" type="text" placeholder="customer-example.com" value="example.com" required>
+          </label>
+          <label>
+            DKIM selectors
+            <input name="selectors" type="text" placeholder="google, selector1">
+          </label>
+          <label>
+            Expected providers
+            <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="button">Run audit</button>
+            <a href="/app" class="button button-ghost" data-cta="hero-workspace">Open full workspace</a>
+          </div>
+        </form>
+
+        <div class="recent-domains" id="hero-recents"></div>
+        <div class="result-shell console-shell" id="hero-results" data-demo-trace></div>
       </div>
     </div>
 
-    <div class="hero-panel panel" data-reveal>
-      <div class="panel-header">
-        <div>
-          <p class="panel-label">Live preview</p>
-          <h2>See the audit product in action</h2>
-        </div>
-        <span class="panel-badge">Interactive</span>
+    {# A ribbon of everything a single call covers. #}
+    <div class="marquee" role="region" aria-label="Protocols checked in every audit">
+      <div class="marquee-track">
+        {% for pass in range(2) %}
+          <ul class="marquee-group" {% if pass %}aria-hidden="true"{% endif %}>
+            {% for item in signal_strips %}
+              <li>{{ item }}</li>
+              <li class="marquee-dot" aria-hidden="true">✦</li>
+            {% endfor %}
+          </ul>
+        {% endfor %}
       </div>
-
-      <form
-        class="audit-form"
-        data-audit-form
-        data-results-target="hero-results"
-        data-recent-target="hero-recents"
-      >
-        <label>
-          Root domain
-          <input name="domain" type="text" placeholder="customer-example.com" value="example.com" required>
-        </label>
-        <label>
-          DKIM selectors
-          <input name="selectors" type="text" placeholder="google, selector1">
-        </label>
-        <label>
-          Expected providers
-          <input name="expected_providers" type="text" placeholder="Google Workspace, SendGrid">
-        </label>
-        <div class="form-actions">
-          <button type="submit" class="button">Run Audit</button>
-          <a href="/app" class="button button-secondary">Open Full Workspace</a>
-        </div>
-      </form>
-
-      <div class="recent-domains" id="hero-recents"></div>
-      <div class="result-shell" id="hero-results"></div>
     </div>
   </section>
 
-  <section class="section" id="product">
+  {# The score band: what the API gives you back, in one glance. #}
+  <section class="section score-band" aria-labelledby="band-heading">
+    <h2 id="band-heading" class="visually-hidden">What every audit returns</h2>
+    <div class="metric-grid">
+      {% for metric in hero_metrics %}
+        <article class="metric-card counter-card" data-reveal>
+          <strong data-count-to="{{ metric.value }}">{{ metric.value }}</strong>
+          <span>{{ metric.label }}</span>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# The authentication chain, drawn. This is the product's whole argument. #}
+  <section class="section chain-section" aria-labelledby="chain-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">The gauntlet</p>
+      <h2 id="chain-heading">Every message your customer sends runs this gauntlet</h2>
+      <p>
+        Receivers check the same things in the same order. An audit walks the chain before
+        their first campaign does. <a href="/product">See each check in detail</a>.
+      </p>
+    </div>
+
+    <figure class="chain-figure panel" data-reveal>
+      <svg class="chain-svg" viewBox="0 0 1000 240" role="img"
+           aria-labelledby="chain-title chain-desc" focusable="false">
+        <title id="chain-title">The email authentication chain</title>
+        <desc id="chain-desc">
+          A message leaves the sender and passes four gates in order — mail routing (MX),
+          sender authorisation (SPF), the cryptographic signature (DKIM), and the alignment
+          policy (DMARC) — before it is eligible for the inbox rather than the spam folder.
+        </desc>
+
+        <defs>
+          <linearGradient id="chain-line" gradientUnits="userSpaceOnUse" x1="70" y1="0" x2="930" y2="0">
+            <stop offset="0%" stop-color="#d95c43" />
+            <stop offset="100%" stop-color="#17696d" />
+          </linearGradient>
+        </defs>
+
+        <path id="chain-path" class="chain-track"
+              d="M70 120 H930" fill="none" stroke="url(#chain-line)" stroke-width="3"
+              stroke-dasharray="10 8" />
+
+        <g class="chain-packet" aria-hidden="true">
+          <rect x="-13" y="-9" width="26" height="18" rx="3" />
+          <path d="M-13 -9 L0 1 L13 -9" fill="none" />
+        </g>
+
+        <g class="chain-nodes">
+          <g class="chain-node" transform="translate(70 120)">
+            <circle r="30" />
+            <text y="6">✉</text>
+            <text class="chain-label" y="62">Sender</text>
+          </g>
+          <g class="chain-node" transform="translate(285 120)">
+            <circle r="30" />
+            <text y="7">MX</text>
+            <text class="chain-label" y="62">Routing</text>
+            <text class="chain-sub" y="80">Can mail arrive?</text>
+          </g>
+          <g class="chain-node" transform="translate(500 120)">
+            <circle r="30" />
+            <text y="7">SPF</text>
+            <text class="chain-label" y="62">Authorised</text>
+            <text class="chain-sub" y="80">Allowed to send?</text>
+          </g>
+          <g class="chain-node" transform="translate(715 120)">
+            <circle r="30" />
+            <text y="7">DKIM</text>
+            <text class="chain-label" y="62">Signed</text>
+            <text class="chain-sub" y="80">Untampered?</text>
+          </g>
+          <g class="chain-node chain-node-end" transform="translate(930 120)">
+            <circle r="30" />
+            <text y="7">DMARC</text>
+            <text class="chain-label" y="62">Aligned</text>
+            <text class="chain-sub" y="80">Inbox or spam?</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption>
+        Miss one gate and delivery becomes a coin flip. The audit reports each gate separately,
+        so remediation is a specific record rather than a vague "check your DNS".
+      </figcaption>
+    </figure>
+  </section>
+
+  {# 15 — reviews. Real ones render here; until then, checkable proof does. #}
+  <section class="section proof-section" id="proof" aria-labelledby="proof-heading">
+    {% if has_reviews %}
+      <div class="section-heading" data-reveal>
+        <p class="section-kicker">Reviews</p>
+        <h2 id="proof-heading">What customers say after they ship it</h2>
+      </div>
+      <div class="review-grid">
+        {% for review in reviews %}
+          <figure class="review-card panel" data-reveal>
+            <div class="review-rating" aria-label="Rated {{ review.rating }} out of 5">
+              {% for _ in range(review.rating) %}<span aria-hidden="true">★</span>{% endfor %}
+            </div>
+            <blockquote>{{ review.body }}</blockquote>
+            <figcaption>
+              <strong>{{ review.author }}</strong>
+              <span>{{ review.author_title }}</span>
+              {% if review.source_url %}
+                <a href="{{ review.source_url }}" rel="noopener nofollow external" target="_blank">
+                  Verified on {{ review.source }}
+                </a>
+              {% endif %}
+            </figcaption>
+          </figure>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="section-heading" data-reveal>
+        <p class="section-kicker">Proof</p>
+        <h2 id="proof-heading">No testimonials yet — here is what you can check instead</h2>
+        <p>
+          We would rather show you things you can open than quotes you cannot verify.
+          Every claim below links to the thing itself.
+        </p>
+      </div>
+      <div class="stamp-grid">
+        {% for signal in trust_signals %}
+          <article class="stamp-card" data-reveal>
+            <div class="stamp-inner">
+              <span class="stamp-postmark" aria-hidden="true">{{ "%02d"|format(loop.index) }}</span>
+              <h3>{{ signal.label }}</h3>
+              <p>{{ signal.detail }}</p>
+              {% if signal.href %}
+                <a class="text-link" href="{{ signal.href }}"
+                   {% if signal.href.startswith('http') %}rel="noopener external" target="_blank"{% endif %}>
+                  Check it yourself
+                </a>
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="section" id="product" aria-labelledby="product-heading">
     <div class="section-heading" data-reveal>
       <p class="section-kicker">Where it fits</p>
-      <h2>Built for the teams who own activation, support, and deliverability.</h2>
+      <h2 id="product-heading">Built for the teams who own activation, support, and deliverability</h2>
       <p>
-        This is not another generic website. It is a narrowly-shaped product surface for
-        customer-domain onboarding, support diagnostics, and long-term sender hygiene.
+        A narrow surface for customer-domain onboarding, support diagnostics, and long-term
+        sender hygiene. <a href="/product">See every check in detail</a>.
       </p>
     </div>
 
@@ -96,13 +286,43 @@
     </div>
   </section>
 
-  <section class="section workflow-section" id="workflow">
+  {# 06 — case studies, teased as index cards and linked to their own pages. #}
+  <section class="section" id="case-studies" aria-labelledby="case-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Case studies</p>
+      <h2 id="case-heading">Three ways teams wire an audit into the product</h2>
+      <p>
+        Worked scenarios with the actual calls involved.
+        <a href="/case-studies">Read all case studies</a>.
+      </p>
+    </div>
+
+    <div class="index-card-grid">
+      {% for study in featured_case_studies %}
+        <article class="index-card" data-reveal>
+          <span class="index-tab">{{ study.segment }}</span>
+          <h3><a href="{{ study.path }}">{{ study.title }}</a></h3>
+          <p>{{ study.summary }}</p>
+          <ul class="metric-inline">
+            {% for metric in study.metrics %}
+              <li><strong>{{ metric.value|safe }}</strong> {{ metric.label }}</li>
+            {% endfor %}
+          </ul>
+          <a class="text-link" href="{{ study.path }}">
+            Read the {{ study.read_minutes }}-minute walkthrough
+          </a>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section workflow-section" id="workflow" aria-labelledby="workflow-heading">
     <div class="section-heading" data-reveal>
       <p class="section-kicker">Workflow</p>
-      <h2>One service. Two clear surfaces.</h2>
+      <h2 id="workflow-heading">One service. Two clear surfaces.</h2>
       <p>
-        Your public site sells the pain cleanly. Your workspace lets operators and prospects
-        run live audits. Your API remains the product engine behind both.
+        The site sells the pain, the <a href="/app">workspace</a> runs live audits, and the
+        API stays the engine behind both.
       </p>
     </div>
 
@@ -139,21 +359,24 @@
     </div>
   </section>
 
-  <section class="section pricing-section" id="pricing">
+  <section class="section pricing-section" id="pricing" aria-labelledby="pricing-heading">
     <div class="section-heading" data-reveal>
       <p class="section-kicker">Pricing</p>
-      <h2>Simple enough for a startup budget, serious enough for recurring usage.</h2>
+      <h2 id="pricing-heading">Startup-sized to begin with, serious at volume</h2>
       <p>
-        The pricing model matches an API product: subscription tiers with room for usage-based
-        overages as audit volume grows.
+        Subscription tiers with usage-based overage as audit volume grows.
+        <a href="/pricing">Compare plans in full</a>.
       </p>
     </div>
 
     <div class="pricing-grid">
       {% for tier in pricing_tiers %}
         <article class="price-card {% if tier.featured %}featured{% endif %}" data-reveal>
+          {% if tier.featured %}
+            <span class="price-stamp" aria-hidden="true">Most balanced</span>
+          {% endif %}
           <div>
-            <p class="card-kicker">{{ "Most balanced" if tier.featured else "Plan" }}</p>
+            <p class="card-kicker">Plan</p>
             <h3>{{ tier.name }}</h3>
             <p class="price-line">{{ tier.price }}<span>{{ tier.period }}</span></p>
             <p class="price-description">{{ tier.description }}</p>
@@ -163,41 +386,50 @@
               <li>{{ feature }}</li>
             {% endfor %}
           </ul>
-          <a class="button {% if not tier.featured %}button-secondary{% endif %}" href="/app">{{ tier.cta }}</a>
+          <a class="button {% if not tier.featured %}button-secondary{% endif %}"
+             href="/contact?topic=Pricing+or+plans" data-cta="pricing-{{ tier.name|lower }}">{{ tier.cta }}</a>
         </article>
       {% endfor %}
     </div>
   </section>
 
-  <section class="section faq-section" id="faq">
+  {# 07 — five FAQs on the landing page, the full set on /faq. #}
+  <section class="section faq-section" id="faq" aria-labelledby="faq-heading">
     <div class="section-heading" data-reveal>
       <p class="section-kicker">FAQ</p>
-      <h2>A practical MVP, positioned like a real company.</h2>
+      <h2 id="faq-heading">The five questions we get most</h2>
+      <p><a href="/faq">Read every question and answer</a>.</p>
     </div>
 
-    <div class="faq-grid">
-      {% for faq in faqs %}
-        <article class="faq-card panel" data-reveal>
-          <h3>{{ faq.question }}</h3>
+    <div class="faq-list wide">
+      {% for faq in featured_faqs %}
+        <details class="faq-item panel" data-reveal {% if loop.first %}open{% endif %}>
+          <summary>
+            <span>{{ faq.question }}</span>
+            <span class="faq-category">{{ faq.category }}</span>
+          </summary>
           <p>{{ faq.answer }}</p>
-        </article>
+        </details>
       {% endfor %}
     </div>
   </section>
 
   <section class="section cta-section" data-reveal>
-    <div class="cta-panel">
+    <div class="cta-panel dispatch-panel">
+      <div class="airmail-rule" aria-hidden="true"></div>
       <div>
         <p class="section-kicker">Next step</p>
-        <h2>Run the workspace locally, then decide what to productize next.</h2>
+        <h2>Audit a domain, then decide whether it belongs in your onboarding</h2>
         <p>
-          The current build already behaves like a credible SaaS front door. The next layer is
-          customer accounts, billing, persistent history, and scheduled monitoring.
+          The workspace runs the same API you would integrate. If it tells you something useful
+          about a domain you own, it will tell your customers the same thing.
+          <strong>{{ promise.headline }}</strong> if you would rather talk it through —
+          <a href="/contact">get in touch</a>.
         </p>
       </div>
       <div class="cta-actions">
-        <a class="button" href="/app">Open Workspace</a>
-        <a class="button button-secondary" href="/docs">Open Swagger Docs</a>
+        <a class="button button-large" href="/app" data-cta="footer-primary">Open workspace</a>
+        <a class="button button-secondary button-large" href="{{ docs_url }}" data-cta="footer-docs">Read API docs</a>
       </div>
     </div>
   </section>

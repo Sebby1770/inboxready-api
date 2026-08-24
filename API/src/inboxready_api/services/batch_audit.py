@@ -14,7 +14,6 @@ from inboxready_api.models import (
 from inboxready_api.services.dns_audit import audit_domain, normalize_domain
 from inboxready_api.settings import Settings
 
-
 SEVERITY_RANK = {
     "high": 0,
     "medium": 1,

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img"
+     aria-label="Simplified map of central Melbourne with the InboxReady location marked">
+  <title>Where InboxReady is based</title>
+  <rect width="640" height="400" fill="#eef1ea"/>
+  <!-- parkland -->
+  <path d="M470 250h150v150H470z" fill="#dbe6d4"/>
+  <path d="M20 40h120v90H20z" fill="#dbe6d4"/>
+  <!-- river -->
+  <path d="M0 268c90 -8 150 22 236 20 96 -2 150 -46 250 -34 60 7 100 26 154 22v52H0z"
+        fill="#c5dbe4"/>
+  <!-- street grid -->
+  <g stroke="#ffffff" stroke-width="7" stroke-linecap="square">
+    <path d="M60 0v268M150 0v250M240 0v262M330 0v246M420 0v240M510 0v236"/>
+    <path d="M0 60h620M0 120h600M0 180h580M0 232h560"/>
+  </g>
+  <g stroke="#e4c98f" stroke-width="11" stroke-linecap="square">
+    <path d="M0 150h592"/>
+    <path d="M285 0v258"/>
+  </g>
+  <!-- labels -->
+  <g font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="14" fill="#5c6b57">
+    <text x="500" y="330">Botanic parkland</text>
+    <text x="34" y="356" fill="#4a7a90">Yarra River</text>
+  </g>
+  <!-- marker -->
+  <g transform="translate(285 150)">
+    <circle r="26" fill="#d95c43" opacity="0.18"/>
+    <path d="M0 -22c-9.4 0-17 7.6-17 17 0 12.7 17 27 17 27s17-14.3 17-27c0-9.4-7.6-17-17-17z"
+          fill="#d95c43" stroke="#9f3f2f" stroke-width="2"/>
+    <circle cy="-5" r="6" fill="#fffaf3"/>
+  </g>
+  <g font-family="Avenir Next Condensed, Futura, sans-serif" font-size="16" font-weight="700" fill="#16243a">
+    <rect x="318" y="132" width="188" height="34" rx="17" fill="#fffaf3" opacity="0.92"/>
+    <text x="334" y="154">InboxReady · Melbourne</text>
+  </g>
+  <rect x="0.5" y="0.5" width="639" height="399" fill="none" stroke="#16243a" stroke-opacity="0.12"/>
+</svg>

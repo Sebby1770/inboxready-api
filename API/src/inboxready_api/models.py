@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
-
 Status = Literal["pass", "warn", "fail", "info"]
 Severity = Literal["low", "medium", "high"]
 ReportFormat = Literal["json", "markdown", "text"]
