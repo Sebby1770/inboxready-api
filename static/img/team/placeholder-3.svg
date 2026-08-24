@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img"
+     aria-label="Placeholder portrait illustration">
+  <title>Placeholder portrait</title>
+  <defs>
+    <clipPath id="c3"><circle cx="80" cy="80" r="80"/></clipPath>
+  </defs>
+  <g clip-path="url(#c3)">
+    <rect width="160" height="160" fill="#c2a15a" fill-opacity="0.16"/>
+    <circle cx="80" cy="62" r="30" fill="#8f7433" fill-opacity="0.55"/>
+    <path d="M8 168c0-38 32-58 72-58s72 20 72 58z" fill="#c2a15a" fill-opacity="0.75"/>
+  </g>
+  <circle cx="80" cy="80" r="78" fill="none" stroke="#8f7433" stroke-opacity="0.35" stroke-width="3"
+          stroke-dasharray="10 8"/>
+</svg>

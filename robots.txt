@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /inboxready-api/
+
+# Machine surfaces: useful to humans, noise in a search index.
+Disallow: /inboxready-api/docs
+Disallow: /inboxready-api/redoc
+Disallow: /inboxready-api/openapi.json
+Disallow: /inboxready-api/thank-you
+Disallow: /inboxready-api/healthz
+Disallow: /inboxready-api/readyz
+Disallow: /inboxready-api/v1/
+
+# Well-behaved crawlers only need one pass per page.
+Crawl-delay: 1
+
+Sitemap: https://sebby1770.github.io/inboxready-api/sitemap.xml

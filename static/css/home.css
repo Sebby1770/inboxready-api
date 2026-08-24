@@ -1,0 +1,936 @@
+/* ==========================================================================
+   Landing page — "airmail dispatch"
+   Loaded only on `/`. The rest of the site stays on the calmer base sheet;
+   the front page is allowed to be louder because it has one job.
+   ========================================================================== */
+
+:root {
+  --ink-deep: #0c1725;
+  --ink-deep-2: #14263c;
+  --cream: #fbf5ea;
+  --cream-soft: rgba(251, 245, 234, 0.74);
+  --cream-faint: rgba(251, 245, 234, 0.14);
+  --airmail-red: #c8402f;
+  --airmail-blue: #1d4f7c;
+}
+
+/* --- the header sits on the dark hero on this page ----------------------- */
+
+body[data-page="/"] .site-header {
+  /* Nearly opaque: at scroll 0 the cream body sits behind it and a translucent
+     header reads as washed-out grey rather than as part of the dark hero. */
+  background: rgba(15, 28, 45, 0.94);
+  border-bottom: 1px solid rgba(251, 245, 234, 0.12);
+  color: var(--cream);
+}
+
+body[data-page="/"] .site-header .brand-copy strong,
+body[data-page="/"] .site-nav a,
+body[data-page="/"] .header-status,
+body[data-page="/"] .nav-toggle {
+  color: var(--cream);
+}
+
+body[data-page="/"] .site-header .brand-copy span {
+  color: var(--cream-soft);
+}
+
+body[data-page="/"] .site-nav a[aria-current="page"] {
+  color: #f0a58c;
+}
+
+body[data-page="/"] .nav-toggle,
+body[data-page="/"] .header-actions .button-secondary {
+  background: rgba(251, 245, 234, 0.08);
+  border-color: rgba(251, 245, 234, 0.28);
+  color: var(--cream);
+}
+
+/* --- airmail rule -------------------------------------------------------- */
+
+.airmail-rule {
+  height: 9px;
+  width: 100%;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--airmail-red) 0 14px,
+    transparent 14px 28px,
+    var(--airmail-blue) 28px 42px,
+    transparent 42px 56px
+  );
+  opacity: 0.9;
+}
+
+/* --- hero ---------------------------------------------------------------- */
+
+.hero-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  padding-bottom: 0;
+  color: var(--cream);
+  background:
+    radial-gradient(120% 90% at 12% 0%, rgba(217, 92, 67, 0.34), transparent 58%),
+    radial-gradient(90% 80% at 92% 18%, rgba(23, 105, 109, 0.42), transparent 60%),
+    linear-gradient(168deg, var(--ink-deep-2) 0%, var(--ink-deep) 62%, #0a1420 100%);
+}
+
+/* Film grain, so the flat gradient reads as printed stock rather than a div. */
+.hero-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.34;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* Real records, ghosted into the background. On-brand wallpaper. */
+.hero-ghost {
+  position: absolute;
+  inset: auto -6% -2rem 4%;
+  z-index: -1;
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 2.1;
+  color: var(--cream);
+  opacity: 0.07;
+  white-space: pre;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hero-stage > .airmail-rule {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 3rem;
+  align-items: center;
+  width: min(100% - 3rem, 1200px);
+  margin: 0 auto;
+  padding: 3.2rem 0 2.6rem;
+}
+
+.eyebrow-terminal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 1.1rem;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid rgba(251, 245, 234, 0.2);
+  border-radius: 999px;
+  background: rgba(251, 245, 234, 0.06);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--cream-soft);
+}
+
+.eyebrow-terminal .prompt {
+  color: #6fd3a0;
+}
+
+.eyebrow-terminal .caret {
+  width: 8px;
+  height: 1.05em;
+  background: #6fd3a0;
+  animation: blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.hero-title {
+  margin: 0 0 1rem;
+  font-family: var(--display-font);
+  font-size: clamp(2.6rem, 5vw, 4.3rem);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+
+.hero-title .marked {
+  position: relative;
+  display: inline-block;
+  color: #f2a184;
+}
+
+.hero-underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.22em;
+  width: 100%;
+  height: 0.34em;
+  overflow: visible;
+}
+
+.hero-underline path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-underline 1.1s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
+}
+
+@keyframes draw-underline {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.hero-stage .hero-lead {
+  max-width: 34rem;
+  margin: 0 0 1.6rem;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--cream-soft);
+}
+
+.hero-stage .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.button-ghost {
+  border: 1px solid rgba(251, 245, 234, 0.4);
+  background: transparent;
+  color: var(--cream);
+}
+
+.button-ghost:hover {
+  background: rgba(251, 245, 234, 0.1);
+  border-color: var(--cream);
+}
+
+.hero-stage .hero-reassurance {
+  margin-top: 1.1rem;
+  color: var(--cream-soft);
+}
+
+.hero-stage .hero-reassurance a {
+  color: #f2a184;
+}
+
+/* --- the live console ---------------------------------------------------- */
+
+.console-panel {
+  border: 1px solid rgba(251, 245, 234, 0.16);
+  border-radius: var(--radius-lg);
+  background: rgba(6, 14, 24, 0.62);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.console-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 1.1rem;
+  border-bottom: 1px solid rgba(251, 245, 234, 0.12);
+  background: rgba(251, 245, 234, 0.05);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cream-soft);
+}
+
+.console-lights {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.console-lights i {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  background: rgba(251, 245, 234, 0.28);
+}
+
+.console-lights i:first-child { background: #e0685a; }
+.console-lights i:nth-child(2) { background: #e0b45a; }
+.console-lights i:last-child { background: #6fd3a0; }
+
+.console-name {
+  flex: 1;
+}
+
+.console-badge {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid rgba(111, 211, 160, 0.5);
+  border-radius: 999px;
+  color: #6fd3a0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.console-form {
+  padding: 1.2rem;
+}
+
+.console-form label {
+  color: var(--cream-soft);
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.console-form input {
+  background: rgba(6, 14, 24, 0.75);
+  border: 1px solid rgba(251, 245, 234, 0.2);
+  color: var(--cream);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.console-form input::placeholder {
+  color: rgba(251, 245, 234, 0.35);
+}
+
+.console-form input:focus-visible {
+  border-color: #6fd3a0;
+  outline-color: #6fd3a0;
+}
+
+.console-shell {
+  margin: 0 1.2rem 1.2rem;
+  padding: 0.9rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  min-height: 0;
+  border-color: rgba(251, 245, 234, 0.12);
+  background: rgba(4, 10, 18, 0.55);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 245, 234, 0.3) transparent;
+}
+
+.console-panel .recent-domains {
+  padding: 0 1.2rem;
+}
+
+.console-panel .recent-domain-button {
+  border-color: rgba(251, 245, 234, 0.24);
+  background: rgba(251, 245, 234, 0.06);
+  color: var(--cream);
+}
+
+.console-panel .result-empty,
+.console-panel .result-empty h3,
+.console-panel .result-empty p,
+.console-panel .sidebar-title {
+  color: var(--cream-soft);
+}
+
+.console-panel .result-empty h3 {
+  color: var(--cream);
+}
+
+/* The demo trace that plays before the first real audit. */
+.trace {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.84rem;
+  line-height: 1.9;
+  color: var(--cream-soft);
+}
+
+.trace li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 0.9rem;
+  padding: 0.15rem 0;
+  list-style: none;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: trace-in 0.32s ease forwards;
+}
+
+.trace .q {
+  grid-column: 1 / -1;
+}
+
+.trace .rr,
+.trace .ok,
+.trace .warn,
+.trace .bad {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace .rr {
+  padding-left: 1.1ch;
+}
+
+.trace {
+  padding: 0;
+}
+
+@keyframes trace-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.trace .q {
+  color: rgba(251, 245, 234, 0.45);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace .rr {
+  color: #8fd6ff;
+}
+
+.trace .ok { color: #6fd3a0; }
+.trace .warn { color: #f0c26b; }
+.trace .bad { color: #f08b7d; }
+
+.trace-score {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(251, 245, 234, 0.2);
+  opacity: 0;
+  animation: trace-in 0.4s ease forwards;
+}
+
+.trace-score .dial {
+  position: relative;
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#6fd3a0 var(--dial, 0%), rgba(251, 245, 234, 0.14) 0);
+  transition: background 1.2s ease;
+}
+
+.trace-score .dial::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #08111d;
+}
+
+.trace-score .dial strong {
+  position: relative;
+  font-family: var(--display-font);
+  font-size: 1.5rem;
+  color: var(--cream);
+}
+
+.trace-score p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--cream-soft);
+}
+
+.trace-score p strong {
+  display: block;
+  font-family: var(--display-font);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+
+/* --- marquee ------------------------------------------------------------- */
+
+.marquee {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid rgba(251, 245, 234, 0.14);
+  border-bottom: 1px solid rgba(251, 245, 234, 0.14);
+  background: rgba(6, 14, 24, 0.5);
+  padding: 0.85rem 0;
+  mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 26s linear infinite;
+}
+
+.marquee-group {
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  margin: 0;
+  padding: 0 0.8rem;
+  list-style: none;
+  font-family: var(--display-font);
+  font-size: 1.05rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cream-soft);
+  white-space: nowrap;
+}
+
+.marquee-dot {
+  color: var(--accent);
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* --- score band ---------------------------------------------------------- */
+
+.score-band {
+  padding-top: 1rem;
+}
+
+.counter-card strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- authentication chain ------------------------------------------------ */
+
+.chain-figure {
+  margin: 0;
+  padding: 1.5rem;
+  overflow-x: auto;
+}
+
+.chain-svg {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+}
+
+.chain-track {
+  opacity: 0.75;
+}
+
+.chain-node circle {
+  fill: var(--panel-strong);
+  stroke: var(--teal);
+  stroke-width: 2.5;
+}
+
+.chain-node-end circle {
+  stroke: var(--accent);
+}
+
+.chain-node text {
+  fill: var(--ink);
+  font-family: var(--display-font);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-anchor: middle;
+}
+
+.chain-node .chain-label {
+  font-size: 15px;
+  fill: var(--ink);
+}
+
+.chain-node .chain-sub {
+  font-family: var(--body-font);
+  font-size: 12.5px;
+  font-weight: 400;
+  fill: var(--ink-soft);
+  letter-spacing: 0;
+}
+
+.chain-packet rect {
+  fill: var(--accent);
+  stroke: var(--accent-deep);
+  stroke-width: 1.5;
+}
+
+.chain-packet path {
+  stroke: #fffaf3;
+  stroke-width: 1.6;
+}
+
+.chain-packet {
+  offset-path: path("M70 120 H930");
+  offset-rotate: 0deg;
+  animation: chain-travel 6.5s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+@keyframes chain-travel {
+  0%   { offset-distance: 0%;   opacity: 0; }
+  6%   { opacity: 1; }
+  22%  { offset-distance: 23.4%; }
+  30%  { offset-distance: 23.4%; }
+  46%  { offset-distance: 50%; }
+  54%  { offset-distance: 50%; }
+  70%  { offset-distance: 75%; }
+  78%  { offset-distance: 75%; }
+  94%  { offset-distance: 100%; opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.chain-figure figcaption {
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+
+/* --- postage-stamp trust cards ------------------------------------------- */
+
+.stamp-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.stamp-card {
+  --perf: 11px;
+  --notch: 22px;
+  position: relative;
+  padding: var(--perf);
+  /*
+   * Perforated stamp edge, painted rather than masked.
+   *
+   * The obvious implementation is four mask layers composited together, but
+   * every mask layer only covers its own edge band, so intersecting them
+   * leaves nothing behind — and browsers still disagree about the operators.
+   * Punching the notches in the page colour over a solid card is boring, works
+   * everywhere, and looks identical.
+   */
+  background:
+    radial-gradient(circle at 50% 0, var(--bg) var(--perf), transparent calc(var(--perf) + 0.5px))
+      0 0 / var(--notch) var(--notch) repeat-x,
+    radial-gradient(circle at 50% 100%, var(--bg) var(--perf), transparent calc(var(--perf) + 0.5px))
+      0 100% / var(--notch) var(--notch) repeat-x,
+    radial-gradient(circle at 0 50%, var(--bg) var(--perf), transparent calc(var(--perf) + 0.5px))
+      0 0 / var(--notch) var(--notch) repeat-y,
+    radial-gradient(circle at 100% 50%, var(--bg) var(--perf), transparent calc(var(--perf) + 0.5px))
+      100% 0 / var(--notch) var(--notch) repeat-y,
+    #fffdf8;
+}
+
+.stamp-inner {
+  position: relative;
+  height: 100%;
+  padding: 1.6rem 1.4rem 1.4rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(23, 105, 109, 0.045) 0 12px,
+      transparent 12px 24px
+    ),
+    var(--bg-soft);
+}
+
+.stamp-postmark {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.8rem;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid rgba(23, 105, 109, 0.4);
+  border-radius: 50%;
+  font-family: var(--display-font);
+  font-size: 0.95rem;
+  color: rgba(23, 105, 109, 0.72);
+  transform: rotate(-12deg);
+}
+
+.stamp-inner h3 {
+  margin: 0 2.6rem 0.6rem 0;
+  font-family: var(--display-font);
+  font-size: 1.25rem;
+}
+
+.stamp-inner p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* --- index-card case studies --------------------------------------------- */
+
+.index-card-grid {
+  display: grid;
+  gap: 2.4rem 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.index-card {
+  position: relative;
+  padding: 1.7rem 1.5rem 1.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px 4px var(--radius-md) var(--radius-md);
+  /* Ruled lines sit on top of the card fill, the way they do on paper. */
+  background:
+    repeating-linear-gradient(
+      transparent 0 30px,
+      rgba(23, 105, 109, 0.13) 30px 31px
+    ),
+    var(--panel-strong);
+  box-shadow: var(--shadow);
+}
+
+.index-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.2rem;
+  width: 1px;
+  background: rgba(217, 92, 67, 0.35);
+}
+
+.index-tab {
+  position: absolute;
+  top: -1.1rem;
+  left: 1.2rem;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--gold);
+  color: #2a2110;
+  font-family: var(--display-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.index-card h3 {
+  margin: 0 0 0.6rem;
+  font-family: var(--display-font);
+  font-size: 1.3rem;
+  line-height: 1.15;
+}
+
+.index-card p {
+  color: var(--ink-soft);
+}
+
+/* --- pricing stamp ------------------------------------------------------- */
+
+.price-card {
+  position: relative;
+}
+
+.price-stamp {
+  position: absolute;
+  top: 1rem;
+  right: -0.6rem;
+  padding: 0.35rem 0.9rem;
+  background: var(--accent);
+  color: #fffaf3;
+  font-family: var(--display-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(4deg);
+  box-shadow: 0 6px 16px rgba(159, 63, 47, 0.34);
+}
+
+/* --- closing dispatch panel ---------------------------------------------- */
+
+.dispatch-panel {
+  position: relative;
+  overflow: hidden;
+  padding-top: 2.4rem;
+}
+
+.dispatch-panel > .airmail-rule {
+  position: absolute;
+  inset: 0 0 auto 0;
+}
+
+/* --- utilities ----------------------------------------------------------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- responsive ---------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 2.2rem;
+    padding-top: 3.5rem;
+  }
+
+  .hero-ghost {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .hero-inner {
+    width: min(100% - 1.2rem, 1200px);
+  }
+
+  .hero-title {
+    font-size: clamp(2.4rem, 11vw, 3.6rem);
+  }
+
+  .console-shell {
+    max-height: 18rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .chain-packet,
+  .eyebrow-terminal .caret {
+    animation: none;
+  }
+
+  .hero-underline path {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+
+  .trace li,
+  .trace-score {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .chain-packet {
+    offset-distance: 50%;
+  }
+}
+
+/* --- live audit report, rendered inside the dark console ------------------
+   app.js emits one report markup for the whole site. On the light workspace
+   page it is already correct; here it needs the dark treatment, so the panel
+   re-skins it rather than the script branching on where it is mounted.
+   ------------------------------------------------------------------------ */
+
+.console-panel .audit-report {
+  padding: 0;
+}
+
+.console-panel .report-title h3,
+.console-panel .score-ring strong {
+  color: var(--cream);
+}
+
+.console-panel .report-title p {
+  color: var(--cream-soft);
+}
+
+.console-panel .score-ring {
+  width: 4.6rem;
+  height: 4.6rem;
+  background:
+    radial-gradient(circle at center, #0b1622 0 55%, transparent 56%),
+    conic-gradient(var(--score-color) calc(var(--score-value) * 1%), rgba(251, 245, 234, 0.16) 0);
+  box-shadow: none;
+}
+
+.console-panel .check-card,
+.console-panel .provider-list,
+.console-panel .recommendations,
+.console-panel .json-panel,
+.console-panel .sidebar-block {
+  background: rgba(251, 245, 234, 0.06);
+  border-color: rgba(251, 245, 234, 0.14);
+}
+
+.console-panel .check-card h4,
+.console-panel .provider-list h4,
+.console-panel .recommendations h4,
+.console-panel .json-panel summary {
+  color: var(--cream);
+}
+
+.console-panel .check-card p,
+.console-panel .recommendations li,
+.console-panel .provider-list p,
+.console-panel .check-meta {
+  color: var(--cream-soft);
+}
+
+.console-panel .recommendations li strong {
+  color: #f2a184;
+}
+
+.console-panel .provider-chip {
+  border-color: rgba(251, 245, 234, 0.24);
+  background: rgba(251, 245, 234, 0.08);
+  color: var(--cream);
+}
+
+.console-panel .status-pass {
+  color: #6fd3a0;
+  background: rgba(111, 211, 160, 0.14);
+}
+
+.console-panel .status-warn {
+  color: #f0c26b;
+  background: rgba(240, 194, 107, 0.14);
+}
+
+.console-panel .status-fail {
+  color: #f08b7d;
+  background: rgba(240, 139, 125, 0.16);
+}
+
+.console-panel .status-info {
+  color: #8fd6ff;
+  background: rgba(143, 214, 255, 0.14);
+}
+
+.console-panel .provider-list a {
+  color: #8fd6ff;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* The console is narrow; the two-column report layout does not fit. */
+.console-panel .report-grid,
+.console-panel .check-grid {
+  grid-template-columns: 1fr;
+}
+
+.console-panel .result-error {
+  color: #f08b7d;
+}

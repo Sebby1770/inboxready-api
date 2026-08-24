@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    
+    <title>What InboxReady checks · InboxReady</title>
+    <meta name="description" content="A check-by-check tour of the InboxReady audit: mail routing, authentication, transport hardening, provider fingerprinting, and how the score is weighted.">
+    <link rel="canonical" href="https://sebby1770.github.io/inboxready-api/product">
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="InboxReady">
+    <meta name="theme-color" content="#d95c43">
+    <meta name="color-scheme" content="light">
+
+    
+    
+      <meta property="og:site_name" content="InboxReady">
+    
+      <meta property="og:type" content="website">
+    
+      <meta property="og:title" content="What InboxReady checks · InboxReady">
+    
+      <meta property="og:description" content="A check-by-check tour of the InboxReady audit: mail routing, authentication, transport hardening, provider fingerprinting, and how the score is weighted.">
+    
+      <meta property="og:url" content="https://sebby1770.github.io/inboxready-api/product">
+    
+      <meta property="og:image" content="https://sebby1770.github.io/inboxready-api/static/img/social-card.svg">
+    
+      <meta property="og:image:type" content="image/svg+xml">
+    
+      <meta property="og:image:width" content="1200">
+    
+      <meta property="og:image:height" content="630">
+    
+      <meta property="og:image:alt" content="InboxReady social sharing card: the wordmark above the line &#39;Email domain readiness in one API call&#39; and the seven protocol checks.">
+    
+      <meta property="og:locale" content="en_AU">
+    
+      <meta name="twitter:card" content="summary_large_image">
+    
+      <meta name="twitter:title" content="What InboxReady checks · InboxReady">
+    
+      <meta name="twitter:description" content="A check-by-check tour of the InboxReady audit: mail routing, authentication, transport hardening, provider fingerprinting, and how the score is weighted.">
+    
+      <meta name="twitter:image" content="https://sebby1770.github.io/inboxready-api/static/img/social-card.svg">
+    
+      <meta name="twitter:image:alt" content="InboxReady social sharing card: the wordmark above the line &#39;Email domain readiness in one API call&#39; and the seven protocol checks.">
+    
+
+    <link rel="icon" type="image/svg+xml" href="/inboxready-api/static/img/favicon.svg">
+    <link rel="apple-touch-icon" href="/inboxready-api/static/img/favicon.svg">
+    <link rel="sitemap" type="application/xml" href="/inboxready-api/sitemap.xml">
+    <link rel="stylesheet" href="/inboxready-api/static/css/site.css">
+    
+
+    
+    <noscript>
+      <style>
+        [data-reveal], .panel, .hero-copy, .hero-panel, .price-card,
+        .step-card, .metric-card, .cta-panel, .use-case-card {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      </style>
+    </noscript>
+
+    
+    <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://sebby1770.github.io/inboxready-api/#organization",
+      "name": "InboxReady",
+      "legalName": "InboxReady",
+      "url": "https://sebby1770.github.io/inboxready-api/",
+      "email": "mailto:hello@inboxready.dev",
+      "description": "InboxReady audits whether a customer-owned domain is ready to send trustworthy email. One API call checks MX, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and BIMI, then returns a weighted score with the exact DNS records to fix.",
+      "foundingDate": "2026",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://sebby1770.github.io/inboxready-api/static/img/favicon.svg"
+      },
+      "sameAs": [
+        "https://github.com/Sebby1770/inboxready-api"
+      ],
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Melbourne",
+        "addressRegion": "Victoria",
+        "addressCountry": "AU"
+      },
+      "contactPoint": [
+        {
+          "@type": "ContactPoint",
+          "contactType": "customer support",
+          "email": "hello@inboxready.dev",
+          "availableLanguage": [
+            "English"
+          ],
+          "areaServed": "Worldwide"
+        }
+      ]
+    },
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://sebby1770.github.io/inboxready-api/#localbusiness",
+      "name": "InboxReady",
+      "image": "https://sebby1770.github.io/inboxready-api/static/img/social-card.svg",
+      "url": "https://sebby1770.github.io/inboxready-api/",
+      "email": "mailto:hello@inboxready.dev",
+      "description": "InboxReady audits whether a customer-owned domain is ready to send trustworthy email. One API call checks MX, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and BIMI, then returns a weighted score with the exact DNS records to fix.",
+      "parentOrganization": {
+        "@id": "https://sebby1770.github.io/inboxready-api/#organization"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Melbourne",
+        "addressRegion": "Victoria",
+        "addressCountry": "AU"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": -37.8136,
+        "longitude": 144.9631
+      },
+      "areaServed": {
+        "@type": "Place",
+        "name": "Worldwide — remote-first, with an Australian home base."
+      },
+      "openingHours": [
+        "Mo-Fr 09:00-17:00"
+      ],
+      "priceRange": "$$",
+      "hasMap": "https://www.openstreetmap.org/?mlat=-37.8136&mlon=144.9631#map=13/-37.8136/144.9631"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://sebby1770.github.io/inboxready-api/#website",
+      "url": "https://sebby1770.github.io/inboxready-api/",
+      "name": "InboxReady",
+      "description": "Domain readiness for sender-facing SaaS",
+      "publisher": {
+        "@id": "https://sebby1770.github.io/inboxready-api/#organization"
+      },
+      "inLanguage": "en",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://sebby1770.github.io/inboxready-api/app?domain={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://sebby1770.github.io/inboxready-api/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Product",
+          "item": "https://sebby1770.github.io/inboxready-api/product"
+        }
+      ]
+    }
+  ]
+}</script>
+
+    <script defer src="/inboxready-api/static/js/site.js"></script>
+    <script defer src="/inboxready-api/static/js/app.js"></script>
+    
+    
+    
+  </head>
+  <body
+    class=""
+    data-page="/product"
+    data-api-base=""
+    data-static-build="true"
+  >
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="/inboxready-api/" aria-label="InboxReady home">
+          <img
+            class="brand-mark-img"
+            src="/inboxready-api/static/img/favicon.svg"
+            width="44"
+            height="44"
+            alt="InboxReady logo: an envelope inside a rounded gradient tile"
+          >
+          <span class="brand-copy">
+            <strong>InboxReady</strong>
+            <span>Domain readiness for sender-facing SaaS</span>
+          </span>
+        </a>
+
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="primary-navigation"
+          data-nav-toggle
+        >
+          <span class="nav-toggle-bars" aria-hidden="true"></span>
+          <span class="nav-toggle-label">Menu</span>
+        </button>
+
+        
+        <nav class="site-nav" id="primary-navigation" aria-label="Primary">
+          
+            <a
+              href="/inboxready-api/product"
+              aria-current="page"
+            >Product</a>
+          
+            <a
+              href="/inboxready-api/case-studies"
+              
+            >Case studies</a>
+          
+            <a
+              href="/inboxready-api/pricing"
+              
+            >Pricing</a>
+          
+            <a
+              href="/inboxready-api/faq"
+              
+            >FAQ</a>
+          
+          <a href="/inboxready-api/docs/">API docs</a>
+        </nav>
+
+        <div class="header-actions">
+          <span class="header-status" data-health-indicator>
+            <span class="status-dot"></span>
+            Checking API
+          </span>
+          <a class="button button-secondary" href="/inboxready-api/app" data-cta="header">Open workspace</a>
+        </div>
+      </header>
+
+      
+      
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <ol>
+            
+              <li>
+                
+                  <a href="/inboxready-api/">Home</a>
+                  <span class="crumb-sep" aria-hidden="true">/</span>
+                
+              </li>
+            
+              <li>
+                
+                  <span aria-current="page">Product</span>
+                
+              </li>
+            
+          </ol>
+        </nav>
+      
+
+      <main id="main">
+        
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Product</p>
+      <h1>Seven checks, one score, and the record you actually have to change</h1>
+      <p>
+        Every audit runs the same checks in the same order and returns them flat, so you can
+        drive a UI straight from the response instead of parsing prose.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="/inboxready-api/app" data-cta="product-primary">Run an audit now</a>
+        <a class="button button-secondary button-large" href="/inboxready-api/docs/">Open the API reference</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="checks-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">What we check</p>
+      <h2 id="checks-heading">Each check answers one question a customer can act on</h2>
+    </div>
+
+    <div class="check-reference-grid">
+      
+        <article class="panel check-reference" id="check-mx" data-reveal>
+          <p class="card-kicker">MX</p>
+          <h3>MX routing</h3>
+          <p class="check-question">Can anyone deliver mail to this domain at all?</p>
+          <p>Resolves the MX record set and reports the hosts in preference order. A domain with no MX cannot receive replies, bounces, or DMARC reports.</p>
+        </article>
+      
+        <article class="panel check-reference" id="check-spf" data-reveal>
+          <p class="card-kicker">SPF</p>
+          <h3>SPF</h3>
+          <p class="check-question">Which servers are allowed to send as this domain?</p>
+          <p>Parses the TXT policy, flags multiple conflicting records, a soft ~all where -all was intended, and include chains pushing the ten-lookup limit.</p>
+        </article>
+      
+        <article class="panel check-reference" id="check-dkim" data-reveal>
+          <p class="card-kicker">DKIM</p>
+          <h3>DKIM</h3>
+          <p class="check-question">Is outbound mail cryptographically signed?</p>
+          <p>Looks up each selector you supply at selector._domainkey and reports which ones publish a usable public key.</p>
+        </article>
+      
+        <article class="panel check-reference" id="check-dmarc" data-reveal>
+          <p class="card-kicker">DMARC</p>
+          <h3>DMARC</h3>
+          <p class="check-question">What should a receiver do when authentication fails?</p>
+          <p>Reads _dmarc, reports the policy, and warns when it is still parked at p=none — monitoring is not enforcement.</p>
+        </article>
+      
+        <article class="panel check-reference" id="check-mta_sts" data-reveal>
+          <p class="card-kicker">MTA-STS</p>
+          <h3>MTA-STS</h3>
+          <p class="check-question">Is TLS enforced for inbound mail?</p>
+          <p>Checks the _mta-sts TXT record and fetches the published policy file over HTTPS to confirm the mode and the MX list agree.</p>
+        </article>
+      
+        <article class="panel check-reference" id="check-tls_rpt" data-reveal>
+          <p class="card-kicker">TLS-RPT</p>
+          <h3>TLS-RPT</h3>
+          <p class="check-question">Will you hear about TLS failures?</p>
+          <p>Confirms _smtp._tls publishes a reporting destination so downgrade attempts surface.</p>
+        </article>
+      
+        <article class="panel check-reference" id="check-bimi" data-reveal>
+          <p class="card-kicker">BIMI</p>
+          <h3>BIMI</h3>
+          <p class="check-question">Is the brand logo eligible to appear in the inbox?</p>
+          <p>Checks the default._bimi record and its logo and certificate references. Informational — BIMI needs enforcing DMARC first.</p>
+        </article>
+      
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="score-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Scoring</p>
+      <h2 id="score-heading">The score is weighted, documented, and queryable</h2>
+      <p>
+        Weights are not a secret sauce. <code>GET /v1/scoring</code> returns them as JSON so
+        you can show a customer why their domain sits where it does.
+      </p>
+    </div>
+
+    <div class="code-grid">
+      <article class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">cURL</p>
+            <h3>Request an audit</h3>
+          </div>
+        </div>
+        <pre><code>curl -X POST https://api.inboxready.dev/v1/audits/email-domain \
+  -H &#34;Authorization: Bearer $INBOXREADY_API_KEY&#34; \
+  -H &#34;Content-Type: application/json&#34; \
+  -d &#39;{
+    &#34;domain&#34;: &#34;customer-example.com&#34;,
+    &#34;selectors&#34;: [&#34;google&#34;, &#34;selector1&#34;],
+    &#34;expected_providers&#34;: [&#34;Google Workspace&#34;]
+  }&#39;</code></pre>
+      </article>
+      <article class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">JavaScript</p>
+            <h3>Gate a step on the result</h3>
+          </div>
+        </div>
+        <pre><code>const response = await fetch(&#34;/v1/audits/email-domain&#34;, {
+  method: &#34;POST&#34;,
+  headers: { &#34;Content-Type&#34;: &#34;application/json&#34; },
+  body: JSON.stringify({
+    domain: &#34;customer-example.com&#34;,
+    selectors: [&#34;google&#34;, &#34;selector1&#34;]
+  })
+});
+
+const audit = await response.json();
+console.log(audit.score, audit.recommendations);</code></pre>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="providers-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Provider detection</p>
+      <h2 id="providers-heading">We name the provider so your instructions can be specific</h2>
+      <p>
+        Fingerprints come from MX hosts, SPF includes, and DKIM selector conventions. Knowing
+        the provider is what turns "add a TXT record" into a screenshot they recognise.
+      </p>
+    </div>
+    <ul class="provider-chip-list">
+      
+        <li class="provider-chip">Google Workspace</li>
+      
+        <li class="provider-chip">Microsoft 365</li>
+      
+        <li class="provider-chip">Amazon SES</li>
+      
+        <li class="provider-chip">Mailgun</li>
+      
+        <li class="provider-chip">SendGrid</li>
+      
+        <li class="provider-chip">Postmark</li>
+      
+        <li class="provider-chip">Mailchimp Transactional</li>
+      
+        <li class="provider-chip">HubSpot</li>
+      
+        <li class="provider-chip">Zendesk</li>
+      
+        <li class="provider-chip">Klaviyo</li>
+      
+    </ul>
+  </section>
+
+  <section class="section cta-section" data-reveal>
+    <div class="cta-panel">
+      <div>
+        <h2>See it against a real domain</h2>
+        <p>
+          Or read how other teams use it in the
+          <a href="/inboxready-api/case-studies">case studies</a>, and what it costs on the
+          <a href="/inboxready-api/pricing">pricing page</a>.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a class="button button-large" href="/inboxready-api/app" data-cta="product-footer">Open workspace</a>
+        <a class="button button-secondary button-large" href="/inboxready-api/contact">Ask a question</a>
+      </div>
+    </div>
+  </section>
+
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-grid">
+          <div class="footer-about">
+            <div class="footer-brand">
+              <img
+                class="brand-mark-img"
+                src="/inboxready-api/static/img/favicon.svg"
+                width="36"
+                height="36"
+                alt=""
+                aria-hidden="true"
+              >
+              <strong>InboxReady</strong>
+            </div>
+            <p>InboxReady audits whether a customer-owned domain is ready to send trustworthy email. One API call checks MX, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and BIMI, then returns a weighted score with the exact DNS records to fix.</p>
+
+            
+            <p class="footer-promise">
+              <strong>We reply within 1 business day.</strong>
+              Monday to Friday, 09:00–17:00 Melbourne time.
+            </p>
+
+            
+            <address class="footer-address">
+              Melbourne, Victoria, Australia<br>
+              <a href="mailto:hello@inboxready.dev">hello@inboxready.dev</a> ·
+              <a href="https://www.google.com/maps/dir/?api=1&amp;destination=Melbourne%2C%20Victoria%2C%20Australia" rel="noopener external" target="_blank">Get directions</a>
+            </address>
+          </div>
+
+          
+            <div class="footer-column">
+              <h2>Product</h2>
+              
+                <a href="/inboxready-api/app">Workspace</a>
+              
+                <a href="/inboxready-api/product">Product</a>
+              
+                <a href="/inboxready-api/case-studies">Case studies</a>
+              
+                <a href="/inboxready-api/pricing">Pricing</a>
+              
+                <a href="/inboxready-api/faq">FAQ</a>
+              
+              
+                <a href="/inboxready-api/docs/">OpenAPI docs</a>
+                
+                  <a href="https://github.com/Sebby1770/inboxready-api" rel="noopener external" target="_blank">Source on GitHub</a>
+                
+              
+            </div>
+          
+            <div class="footer-column">
+              <h2>Company</h2>
+              
+                <a href="/inboxready-api/about">About</a>
+              
+                <a href="/inboxready-api/contact">Contact</a>
+              
+              
+            </div>
+          
+            <div class="footer-column">
+              <h2>Legal</h2>
+              
+                <a href="/inboxready-api/privacy">Privacy</a>
+              
+                <a href="/inboxready-api/terms">Terms</a>
+              
+                <a href="/inboxready-api/security">Security</a>
+              
+              
+            </div>
+          
+        </div>
+
+        <div class="footer-base">
+          <p>&copy; 2026 InboxReady. API version 0.5.0.</p>
+          <p>
+            <a href="/inboxready-api/sitemap.xml">Sitemap</a> ·
+            <a href="/inboxready-api/robots.txt">robots.txt</a> ·
+            <a href="/inboxready-api/privacy">Privacy</a> ·
+            <a href="/inboxready-api/terms">Terms</a>
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    
+    <div class="sticky-cta" data-sticky-cta hidden>
+      <div class="sticky-cta-copy">
+        <strong>Audit a domain now</strong>
+        <span>We reply within 1 business day if you get stuck.</span>
+      </div>
+      <a class="button" href="/inboxready-api/app" data-cta="sticky-mobile">Run a free audit</a>
+      <button class="sticky-cta-dismiss" type="button" data-sticky-dismiss aria-label="Dismiss this banner">
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+
+    
+  </body>
+</html>

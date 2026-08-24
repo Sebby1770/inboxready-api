@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img"
+     aria-label="InboxReady — email domain readiness in one API call. Checks MX, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and BIMI.">
+  <title>InboxReady social sharing card</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7f1e7"/>
+      <stop offset="55%" stop-color="#f2ede3"/>
+      <stop offset="100%" stop-color="#e6ded0"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d95c43"/>
+      <stop offset="50%" stop-color="#e7924f"/>
+      <stop offset="100%" stop-color="#17696d"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1080" cy="90" r="220" fill="#17696d" opacity="0.10"/>
+  <circle cx="120" cy="560" r="180" fill="#d95c43" opacity="0.10"/>
+
+  <g transform="translate(80 72)">
+    <rect width="88" height="88" rx="22" fill="url(#mark)"/>
+    <path d="M20 26h48v30H55l-8 8-8-8H20z" fill="#fffaf3" opacity="0.95"/>
+    <path d="M28 36h31M28 45h21" stroke="#17304d" stroke-linecap="round" stroke-width="5.5"/>
+    <text x="112" y="42" font-family="Avenir Next Condensed, Futura, Franklin Gothic Medium, sans-serif"
+          font-size="42" font-weight="700" letter-spacing="2" fill="#16243a">INBOXREADY</text>
+    <text x="114" y="74" font-family="Iowan Old Style, Palatino, Georgia, serif"
+          font-size="22" fill="#4d5d72">Domain readiness for sender-facing SaaS</text>
+  </g>
+
+  <text x="80" y="278" font-family="Avenir Next Condensed, Futura, Franklin Gothic Medium, sans-serif"
+        font-size="74" font-weight="700" fill="#16243a">Email domain readiness</text>
+  <text x="80" y="360" font-family="Avenir Next Condensed, Futura, Franklin Gothic Medium, sans-serif"
+        font-size="74" font-weight="700" fill="#d95c43">in one API call.</text>
+
+  <text x="80" y="424" font-family="Iowan Old Style, Palatino, Georgia, serif"
+        font-size="27" fill="#4d5d72">A weighted score plus the exact DNS records your customer has to fix.</text>
+
+  <g font-family="Avenir Next Condensed, Futura, sans-serif" font-size="24" font-weight="600" fill="#17696d">
+    <g>
+      <rect x="80"  y="474" width="118" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="139" y="507" text-anchor="middle">MX</text>
+    </g>
+    <g>
+      <rect x="212" y="474" width="118" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="271" y="507" text-anchor="middle">SPF</text>
+    </g>
+    <g>
+      <rect x="344" y="474" width="132" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="410" y="507" text-anchor="middle">DKIM</text>
+    </g>
+    <g>
+      <rect x="490" y="474" width="152" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="566" y="507" text-anchor="middle">DMARC</text>
+    </g>
+    <g>
+      <rect x="656" y="474" width="172" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="742" y="507" text-anchor="middle">MTA-STS</text>
+    </g>
+    <g>
+      <rect x="842" y="474" width="164" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="924" y="507" text-anchor="middle">TLS-RPT</text>
+    </g>
+    <g>
+      <rect x="1020" y="474" width="118" height="52" rx="26" fill="#17696d" opacity="0.10"/>
+      <text x="1079" y="507" text-anchor="middle">BIMI</text>
+    </g>
+  </g>
+
+  <g transform="translate(940 210)">
+    <circle r="96" fill="#fffaf3" stroke="#17696d" stroke-width="14" stroke-opacity="0.22"/>
+    <circle r="96" fill="none" stroke="#1f7a56" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="512 603" transform="rotate(-90)"/>
+    <text text-anchor="middle" y="18" font-family="Avenir Next Condensed, Futura, sans-serif"
+          font-size="64" font-weight="700" fill="#16243a">92</text>
+  </g>
+</svg>

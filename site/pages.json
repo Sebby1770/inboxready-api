@@ -1,0 +1,110 @@
+{
+  "count": 15,
+  "pages": [
+    {
+      "path": "/",
+      "title": "Email domain readiness API",
+      "description": "Audit MX, SPF, DKIM, DMARC, MTA-STS, TLS-RPT, and BIMI in one API call and get back a weighted score plus the exact DNS records your customer needs to fix.",
+      "indexable": true,
+      "parent": null
+    },
+    {
+      "path": "/product",
+      "title": "What InboxReady checks",
+      "description": "A check-by-check tour of the InboxReady audit: mail routing, authentication, transport hardening, provider fingerprinting, and how the score is weighted.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/case-studies",
+      "title": "Case studies",
+      "description": "Three worked scenarios showing how teams wire domain audits into activation flows, support triage, and ongoing monitoring of a portfolio of domains.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/pricing",
+      "title": "Pricing and plans",
+      "description": "Starter, Growth, and Pro plans for embedding domain audits in your product, with monthly audit allowances, overage behaviour, and the support included.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/faq",
+      "title": "Frequently asked questions",
+      "description": "What the audit actually checks, how long integration takes, what data is stored, how fast support replies, and what happens when you exceed a plan.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/about",
+      "title": "About InboxReady",
+      "description": "Who builds InboxReady, why the product is deliberately narrow, and how the team works with the customers who embed the audit in their onboarding.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/contact",
+      "title": "Contact and directions",
+      "description": "Reach the InboxReady team, read our first-response promise, and find where we are based, with directions for anyone visiting Melbourne in person.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/app",
+      "title": "Live audit workspace",
+      "description": "Run a live email-domain audit in the browser: enter a domain, review every check and recommendation, and inspect the raw JSON that the API returns.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/privacy",
+      "title": "Privacy policy",
+      "description": "What InboxReady collects when you audit a domain or contact us, the lawful basis for holding it, how long it is kept, and how to have it deleted.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/terms",
+      "title": "Terms of service",
+      "description": "The terms covering acceptable use of the InboxReady API, fair-use limits, billing and overages, availability expectations, and limits on liability.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/security",
+      "title": "Security and disclosure",
+      "description": "How InboxReady is hardened, what an audit does and does not touch on your network, and how to report a vulnerability to us responsibly.",
+      "indexable": true,
+      "parent": "/"
+    },
+    {
+      "path": "/thank-you",
+      "title": "Thanks \u2014 message received",
+      "description": "Your message reached the InboxReady team. Here is when to expect a reply, and what is worth reading or trying in the meantime while you wait.",
+      "indexable": false,
+      "parent": "/contact"
+    },
+    {
+      "path": "/case-studies/onboarding-activation",
+      "title": "Cutting DNS back-and-forth out of self-serve activation",
+      "description": "How a sender-facing SaaS turns a blocking DNS step into a guided, self-correcting part of its signup flow.",
+      "indexable": true,
+      "parent": "/case-studies"
+    },
+    {
+      "path": "/case-studies/support-triage",
+      "title": "Giving support an answer before engineering gets paged",
+      "description": "How a support team replaces 'it looks like a DNS thing' with a scored, shareable report attached to the ticket.",
+      "indexable": true,
+      "parent": "/case-studies"
+    },
+    {
+      "path": "/case-studies/portfolio-monitoring",
+      "title": "Watching a portfolio of customer domains for silent drift",
+      "description": "How an agency or platform keeps hundreds of managed domains from quietly losing their authentication posture.",
+      "indexable": true,
+      "parent": "/case-studies"
+    }
+  ]
+}
