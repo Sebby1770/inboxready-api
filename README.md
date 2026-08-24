@@ -2,7 +2,7 @@
 
 InboxReady is a Python/FastAPI service that audits whether customer domains are ready to send trustworthy email.
 
-**Version:** 0.5.0
+**Version:** 0.5.0 · **Site:** <https://sebby1770.github.io/inboxready-api/>
 
 It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI; detects likely sending providers; returns a weighted readiness score and remediation guidance; and includes caching, optional API keys, rate limiting, domain compare, and markdown reports.
 
@@ -47,8 +47,11 @@ It also ships the marketing site around the API — twelve pages, structured dat
 | [`API/`](./API) | FastAPI package, tests, Dockerfile |
 | [`API/src/inboxready_api/site/`](./API/src/inboxready_api/site) | Page registry, SEO, content, leads, site router |
 | [`docs/growth-checklist.md`](./docs/growth-checklist.md) | Every checklist item, its code, and its test |
+| [`docs/publishing.md`](./docs/publishing.md) | How the site is rendered to static files and published |
+| [`API/scripts/build_static.py`](./API/scripts/build_static.py) | Renders the whole site for GitHub Pages |
 | [`render.yaml`](./render.yaml) | Render.com deploy config |
 | [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | ruff + pytest on 3.11 / 3.12 / 3.13 |
+| [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) | Builds and publishes the site to `gh-pages` |
 
 ## Run locally
 
@@ -161,6 +164,18 @@ invariants — including that no invented testimonials have crept in.
 ```bash
 pytest tests/test_growth_checklist.py -v   # the twenty-item checklist
 ```
+
+## Publish the site
+
+```bash
+cd API && make site
+```
+
+Renders every page to `../_site` and checks the links. CI does the same on
+every push to `main` and publishes to `gh-pages`. The published copy has no
+backend, so the audit and contact forms explain themselves rather than failing
+— pass `--api-base` to point them at a running instance. Details in
+[`docs/publishing.md`](./docs/publishing.md).
 
 ## Deploy notes
 

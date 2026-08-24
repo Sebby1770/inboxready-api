@@ -51,7 +51,12 @@
       ></script>
     {% endif %}
   </head>
-  <body class="{{ body_class|default('') }}" data-page="{{ page.path }}">
+  <body
+    class="{{ body_class|default('') }}"
+    data-page="{{ page.path }}"
+    data-api-base="{{ api_base_url }}"
+    data-static-build="{{ 'true' if static_build else 'false' }}"
+  >
     <a class="skip-link" href="#main">Skip to main content</a>
 
     <div class="site-shell">
@@ -89,7 +94,7 @@
               {% if nav_page.path == page.path %}aria-current="page"{% endif %}
             >{{ nav_page.nav_label }}</a>
           {% endfor %}
-          <a href="/docs">API docs</a>
+          <a href="{{ docs_url }}">API docs</a>
         </nav>
 
         <div class="header-actions">
@@ -160,8 +165,12 @@
                 <a href="{{ link.path }}">{{ link.nav_label }}</a>
               {% endfor %}
               {% if column == 'Product' %}
-                <a href="/docs">OpenAPI docs</a>
-                <a href="/healthz">Health check</a>
+                <a href="{{ docs_url }}">OpenAPI docs</a>
+                {% if static_build %}
+                  <a href="{{ repository_url }}" rel="noopener external" target="_blank">Source on GitHub</a>
+                {% else %}
+                  <a href="/healthz">Health check</a>
+                {% endif %}
               {% endif %}
             </div>
           {% endfor %}

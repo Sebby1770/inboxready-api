@@ -95,6 +95,21 @@ class Settings(BaseSettings):
         description="Emit CSP, Referrer-Policy, and related hardening headers on HTML responses.",
     )
 
+    static_build: bool = Field(
+        default=False,
+        description=(
+            "Render pages for a static host (GitHub Pages). Swaps API-dependent "
+            "surfaces for ones that work without a running backend."
+        ),
+    )
+    api_base_url: str = Field(
+        default="",
+        description=(
+            "Absolute origin of a running InboxReady API. Only needed for a static "
+            "build that should still run live audits against a deployed backend."
+        ),
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="INBOXREADY_",
         env_file=".env",
@@ -108,7 +123,7 @@ class Settings(BaseSettings):
             return ""
         return str(value)
 
-    @field_validator("site_base_url", mode="before")
+    @field_validator("site_base_url", "api_base_url", mode="before")
     @classmethod
     def strip_trailing_slash(cls, value: object) -> str:
         return str(value or "").rstrip("/")

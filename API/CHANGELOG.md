@@ -33,6 +33,13 @@ guarded by a test in `tests/test_growth_checklist.py`.
 - Ruff lint configuration and a CI lint job
 - [`docs/growth-checklist.md`](../docs/growth-checklist.md) mapping every item
   to its implementation and its test
+- **Static site export** (`scripts/build_static.py`, `make site`) — renders all
+  15 pages, the 404, `robots.txt`, `sitemap.xml`, and a Redoc API reference
+  built from the live OpenAPI schema. Published to GitHub Pages by
+  `.github/workflows/pages.yml`, with a link checker over the output
+- `INBOXREADY_STATIC_BUILD` and `INBOXREADY_API_BASE_URL`: the published pages
+  swap the audit and contact forms for honest alternatives when no backend is
+  attached, and call a real API when one is configured
 
 ### Changed
 - Version **0.5.0**

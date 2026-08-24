@@ -54,6 +54,22 @@ def _now_iso_date() -> str:
     return datetime.now(UTC).date().isoformat()
 
 
+def _trust_signals(static_build: bool) -> tuple[content.TrustSignal, ...]:
+    """Only advertise proof the current deployment can actually serve.
+
+    The live health probes are a genuine trust signal on a running instance and
+    a dead link on a static mirror, so the static build simply does not make
+    the claim.
+    """
+    if not static_build:
+        return content.TRUST_SIGNALS
+    return tuple(
+        signal
+        for signal in content.TRUST_SIGNALS
+        if not signal.href.startswith(("/healthz", "/readyz"))
+    )
+
+
 def base_context(request: Request, page: Page) -> dict[str, Any]:
     """Context shared by every page: nav, SEO head, structured data, analytics."""
     settings = get_settings()
@@ -76,13 +92,17 @@ def base_context(request: Request, page: Page) -> dict[str, Any]:
         "breadcrumb_trail": trail if len(trail) > 1 else [],
         "primary_nav": primary_nav(),
         "footer_nav": footer_nav(),
+        "static_build": settings.static_build,
+        "api_base_url": settings.api_base_url,
+        "docs_url": "/docs/" if settings.static_build else "/docs",
+        "repository_url": content.ORG.repository,
         "analytics_id": settings.analytics_ga4_id.strip(),
         "analytics_require_consent": settings.analytics_require_consent,
         "current_year": datetime.now(UTC).year,
         "directions_url": seo.directions_url(),
         "apple_maps_url": seo.apple_maps_url(),
         "map_view_url": seo.map_view_url(),
-        "trust_signals": content.TRUST_SIGNALS,
+        "trust_signals": _trust_signals(settings.static_build),
         "reviews": content.REVIEWS,
         "has_reviews": content.has_reviews(),
         "faqs": content.FAQS,

@@ -1,4 +1,4 @@
-.PHONY: install run test lint fmt check og-card
+.PHONY: install run test lint fmt check og-card site
 
 install:
 	python3 -m venv .venv
@@ -11,10 +11,16 @@ test:
 	. .venv/bin/activate && pytest
 
 lint:
-	. .venv/bin/activate && ruff check src tests
+	. .venv/bin/activate && ruff check src tests scripts ../.github/scripts
 
 fmt:
-	. .venv/bin/activate && ruff check --fix src tests
+	. .venv/bin/activate && ruff check --fix src tests scripts ../.github/scripts
+
+# Render the public site to ../_site, exactly as the Pages workflow does.
+site:
+	. .venv/bin/activate && python scripts/build_static.py --out ../_site
+	. .venv/bin/activate && python ../.github/scripts/check_links.py ../_site
+	@echo "Serve it with: python3 -m http.server -d ../_site 8080"
 
 # What CI runs.
 check: lint test

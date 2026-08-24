@@ -1,5 +1,22 @@
 const RECENT_DOMAINS_KEY = "inboxready.recent-domains";
 
+/**
+ * Where the audit API lives.
+ *
+ * Empty means "same origin", which is the normal case. A static publish of the
+ * site (GitHub Pages) has no backend, so it sets `data-static-build` and the
+ * form explains that instead of firing a request that can only 404. Point
+ * `INBOXREADY_API_BASE_URL` at a deployed instance and the same static pages
+ * run live audits against it.
+ */
+function apiBase() {
+  return document.body.dataset.apiBase || "";
+}
+
+function isStaticBuild() {
+  return document.body.dataset.staticBuild === "true" && !apiBase();
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -70,6 +87,21 @@ function renderEmptyState(target) {
     <div class="result-empty">
       <h3>Ready for a live audit</h3>
       <p>Submit a domain to see provider detection, protocol checks, a weighted score, and remediation guidance.</p>
+    </div>
+  `;
+}
+
+function renderStaticNotice(target) {
+  target.innerHTML = `
+    <div class="result-empty">
+      <h3>No API attached to this page</h3>
+      <p>
+        This is the published site, served as static files, so there is no audit
+        backend behind the form. Run it locally in about a minute:
+      </p>
+      <pre><code>pip install -e "API[dev]"
+uvicorn --app-dir API/src inboxready_api.main:app</code></pre>
+      <p>Then open <code>http://127.0.0.1:8000/app</code> and this form is live.</p>
     </div>
   `;
 }
@@ -190,7 +222,7 @@ function renderAudit(target, audit) {
 }
 
 async function runAudit(payload) {
-  const response = await fetch("/v1/audits/email-domain", {
+  const response = await fetch(`${apiBase()}/v1/audits/email-domain`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -223,6 +255,18 @@ function initAuditForm(form) {
   const submitButton = form.querySelector('button[type="submit"]');
 
   if (!resultsTarget || !domainInput || !submitButton) return;
+
+  if (isStaticBuild()) {
+    // The button stays enabled on purpose: a disabled control with no
+    // explanation is worse than one that tells you why it cannot run.
+    renderStaticNotice(resultsTarget);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      renderStaticNotice(resultsTarget);
+      resultsTarget.scrollIntoView({ block: "nearest" });
+    });
+    return;
+  }
 
   renderEmptyState(resultsTarget);
   renderRecentDomains(recentTarget, (domain) => {
@@ -304,8 +348,13 @@ async function initHealthIndicator() {
   const indicator = document.querySelector("[data-health-indicator]");
   if (!indicator) return;
 
+  if (isStaticBuild()) {
+    indicator.innerHTML = '<span class="status-dot"></span> Static preview';
+    return;
+  }
+
   try {
-    const response = await fetch("/healthz");
+    const response = await fetch(`${apiBase()}/healthz`);
     if (!response.ok) throw new Error("not ok");
     const payload = await response.json();
     indicator.innerHTML = '<span class="status-dot ready"></span> API ' + escapeHtml(payload.status);

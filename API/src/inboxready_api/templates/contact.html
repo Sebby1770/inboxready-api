@@ -26,56 +26,70 @@
         </div>
       </div>
 
-      {% if form_error %}
-        <p class="form-error" role="alert">{{ form_error }}</p>
-      {% endif %}
-
-      <form class="audit-form stacked" method="post" action="/contact" novalidate>
-        <label>
-          Your name
-          <input name="name" type="text" autocomplete="name" required
-                 value="{{ form_values.name if form_values else '' }}">
-        </label>
-        <label>
-          Work email
-          <input name="email" type="email" autocomplete="email" required
-                 value="{{ form_values.email if form_values else '' }}">
-        </label>
-        <label>
-          Company <span class="label-optional">(optional)</span>
-          <input name="company" type="text" autocomplete="organization"
-                 value="{{ form_values.company if form_values else '' }}">
-        </label>
-        <label>
-          What is this about?
-          <select name="topic">
-            {% for topic in topics %}
-              <option value="{{ topic }}"
-                {% if (form_values and form_values.topic == topic) or request.query_params.get('topic') == topic %}selected{% endif %}
-              >{{ topic }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Message
-          <textarea name="message" rows="6" required
-                    placeholder="The domain, what you expected, and what happened instead.">{{ form_values.message if form_values else '' }}</textarea>
-        </label>
-
-        {# Honeypot: hidden from people, irresistible to bots. #}
-        <div class="honeypot" aria-hidden="true">
-          <label>
-            Leave this field empty
-            <input name="website" type="text" tabindex="-1" autocomplete="off">
-          </label>
-        </div>
-
-        <button type="submit" class="button full-width" data-cta="contact-submit">Send message</button>
+      {% if static_build %}
+        <p class="promise-banner">
+          This is the published preview of the site, served as static files, so there is no
+          backend here to receive a form. Email works just as well and reaches the same place.
+        </p>
+        <a class="button full-width" href="mailto:{{ org.email }}?subject=InboxReady%20enquiry"
+           data-cta="contact-mailto">Email {{ org.email }}</a>
         <p class="form-footnote">
-          We use what you send here to reply, and nothing else. See the
+          Running the app yourself? The form posts to <code>POST /contact</code> and stores
+          submissions on your own instance — see the
           <a href="/privacy">privacy policy</a>.
         </p>
-      </form>
+      {% else %}
+      {% if form_error %}
+          <p class="form-error" role="alert">{{ form_error }}</p>
+        {% endif %}
+  
+        <form class="audit-form stacked" method="post" action="/contact" novalidate>
+          <label>
+            Your name
+            <input name="name" type="text" autocomplete="name" required
+                   value="{{ form_values.name if form_values else '' }}">
+          </label>
+          <label>
+            Work email
+            <input name="email" type="email" autocomplete="email" required
+                   value="{{ form_values.email if form_values else '' }}">
+          </label>
+          <label>
+            Company <span class="label-optional">(optional)</span>
+            <input name="company" type="text" autocomplete="organization"
+                   value="{{ form_values.company if form_values else '' }}">
+          </label>
+          <label>
+            What is this about?
+            <select name="topic">
+              {% for topic in topics %}
+                <option value="{{ topic }}"
+                  {% if (form_values and form_values.topic == topic) or request.query_params.get('topic') == topic %}selected{% endif %}
+                >{{ topic }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Message
+            <textarea name="message" rows="6" required
+                      placeholder="The domain, what you expected, and what happened instead.">{{ form_values.message if form_values else '' }}</textarea>
+          </label>
+  
+          {# Honeypot: hidden from people, irresistible to bots. #}
+          <div class="honeypot" aria-hidden="true">
+            <label>
+              Leave this field empty
+              <input name="website" type="text" tabindex="-1" autocomplete="off">
+            </label>
+          </div>
+  
+          <button type="submit" class="button full-width" data-cta="contact-submit">Send message</button>
+          <p class="form-footnote">
+            We use what you send here to reply, and nothing else. See the
+            <a href="/privacy">privacy policy</a>.
+          </p>
+        </form>
+      {% endif %}
     </div>
 
     {# 14 — maps and directions. #}
@@ -128,9 +142,11 @@
       <div class="sidebar-block">
         <p class="sidebar-title">Faster than email</p>
         <ul class="card-points">
-          <li><a href="/healthz">/healthz</a> — is the service up?</li>
+          {% if not static_build %}
+            <li><a href="/healthz">/healthz</a> — is the service up?</li>
+          {% endif %}
           <li><a href="/faq">FAQ</a> — the eight questions we get most</li>
-          <li><a href="/docs">API docs</a> — every endpoint and schema</li>
+          <li><a href="{{ docs_url }}">API docs</a> — every endpoint and schema</li>
         </ul>
       </div>
     </aside>

@@ -38,8 +38,8 @@
       <h2 id="availability">Availability</h2>
       <p>
         We aim for continuous availability and publish
-        <a href="/healthz">liveness</a> and <a href="/readyz">readiness</a> probes so you can
-        verify it yourself. Audits depend on public DNS and on policy files published by third
+        {% if static_build %}liveness and readiness probes{% else %}<a href="/healthz">liveness</a>
+        and <a href="/readyz">readiness</a> probes{% endif %} so you can verify it yourself. Audits depend on public DNS and on policy files published by third
         parties; when those are slow or unreachable, a check returns a warning rather than a
         false pass. No uptime figure is contractually promised on the self-serve plans.
       </p>
