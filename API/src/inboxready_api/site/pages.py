@@ -99,6 +99,20 @@ STATIC_PAGES: tuple[Page, ...] = (
         priority=0.8,
     ),
     Page(
+        path="/dmarc-reports",
+        template="dmarc_reports.html",
+        title="Read your DMARC reports",
+        description=(
+            "Upload the aggregate reports mailbox providers send you and find out who is "
+            "sending as your domain, what authenticates, and whether p=reject is safe yet."
+        ),
+        nav_label="DMARC reports",
+        nav_group="primary",
+        parent="/product",
+        crumb="DMARC reports",
+        priority=0.8,
+    ),
+    Page(
         path="/pricing",
         template="pricing.html",
         title="Pricing and plans",
