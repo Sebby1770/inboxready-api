@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section page-hero above-the-fold">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">DMARC reports</p>
+      <h1>Before you turn on p=reject, find out whose mail breaks</h1>
+      <p>
+        A DNS lookup tells you DMARC is published. It cannot tell you what happens when you
+        enforce it. That answer is already sitting in the aggregate reports mailbox providers
+        send you every day, as gzipped XML nobody reads. Upload them and get the decision.
+      </p>
+      <div class="hero-actions">
+        <a class="button button-large" href="{{ docs_url }}" data-cta="dmarc-primary">See the API reference</a>
+        <a class="button button-secondary button-large" href="/contact">Ask about a rollout</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="classify-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">What comes back</p>
+      <h2 id="classify-heading">Every sending source, sorted into four kinds</h2>
+      <p>
+        Classification uses the evaluated results in the report, which already account for
+        alignment. That matters: unaligned SPF looks like a pass in a raw log and is a failure
+        to a receiver.
+      </p>
+    </div>
+
+    <div class="check-reference-grid">
+      {% for item in classifications %}
+        <article class="panel check-reference" id="class-{{ item.key }}" data-reveal>
+          <p class="card-kicker">{{ item.key|upper }}</p>
+          <h3>{{ item.name }}</h3>
+          <p class="check-question">{{ item.shape }}</p>
+          <p>{{ item.detail }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="gate-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">The gate</p>
+      <h2 id="gate-heading">When the answer is “not yet”, it says what is in the way</h2>
+      <p>
+        The readiness check is deliberately conservative. It needs enough volume to judge, a
+        high aligned pass rate, and no meaningful source still failing. Forwarding never blocks
+        a rollout, because forwarded mail with an aligned signature already passes DMARC.
+      </p>
+    </div>
+
+    <div class="code-grid">
+      <article class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Thresholds</p>
+            <h3>What each step requires</h3>
+          </div>
+        </div>
+        <table class="scoring-table">
+          <caption class="visually-hidden">Aligned pass rate required for each DMARC policy step</caption>
+          <thead>
+            <tr><th scope="col">Step</th><th scope="col">Aligned pass rate</th><th scope="col">Also required</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">none → quarantine</th>
+              <td>{{ quarantine_threshold }}</td>
+              <td>No unauthenticated source above {{ blocker_share }} of volume</td>
+            </tr>
+            <tr>
+              <th scope="row">quarantine → reject</th>
+              <td>{{ reject_threshold }}</td>
+              <td>Same, plus at least 100 reported messages</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="panel code-panel" data-reveal>
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">Command line</p>
+            <h3>Gate a pipeline on it</h3>
+          </div>
+        </div>
+        <pre><code>{{ sample_cli }}</code></pre>
+        <p>
+          Exit code 0 when the next step is safe, 1 when it is not, so this can sit in CI next
+          to your other checks.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="privacy-heading">
+    <div class="section-heading" data-reveal>
+      <p class="section-kicker">Handling</p>
+      <h2 id="privacy-heading">What we do with an uploaded report</h2>
+    </div>
+    <div class="check-reference-grid">
+      <article class="panel check-reference" data-reveal>
+        <h3>Parsed, summarised, discarded</h3>
+        <p>
+          Reports are read in memory to build the response and are not written to disk or
+          retained afterwards. See the <a href="/privacy">privacy policy</a>.
+        </p>
+      </article>
+      <article class="panel check-reference" data-reveal>
+        <h3>Treated as untrusted input</h3>
+        <p>
+          Anyone can email you a report, so uploads are bounded on compressed size, decompressed
+          size, member count, and record count, and any file declaring a DTD or XML entities is
+          refused rather than parsed.
+        </p>
+      </article>
+      <article class="panel check-reference" data-reveal>
+        <h3>No personal content</h3>
+        <p>
+          Aggregate reports carry sending IPs, volumes, and authentication results. They do not
+          contain message bodies, subjects, or recipient addresses.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section cta-section" data-reveal>
+    <div class="cta-panel">
+      <div>
+        <h2>Already have a week of reports?</h2>
+        <p>
+          Point the endpoint at them and read the verdict. The
+          <a href="/product">product page</a> covers the DNS side of the audit.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a class="button button-large" href="{{ docs_url }}">API reference</a>
+        <a class="button button-secondary button-large" href="/app">Open workspace</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

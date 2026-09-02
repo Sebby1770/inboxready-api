@@ -9,6 +9,12 @@ from inboxready_api import __version__
 from inboxready_api.models import BatchAuditRequest, CompareRequest, DomainAuditRequest
 from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
+from inboxready_api.services.dmarc_reports import (
+    ReportError,
+    assess_readiness,
+    parse_reports,
+    summarize_reports,
+)
 from inboxready_api.services.dns_audit import audit_domain
 from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.provider_detection import get_provider_catalog
@@ -64,6 +70,9 @@ def run_command(args: argparse.Namespace) -> int:
                 output = "\n".join(lines) if lines else "(no history)"
         write_output(output, getattr(args, "out", None))
         return EXIT_PASS
+
+    if args.command == "dmarc-reports":
+        return run_dmarc_reports(args)
 
     if args.command == "scoring":
         payload = scoring_document()
@@ -225,7 +234,110 @@ def build_parser() -> argparse.ArgumentParser:
     scoring_p.add_argument("--out", default=None)
     scoring_p.add_argument("--json", action="store_true")
 
+    dmarc = subparsers.add_parser(
+        "dmarc-reports",
+        help="Analyse DMARC aggregate (RUA) reports and say whether the next policy step is safe.",
+    )
+    dmarc.add_argument("paths", nargs="+", help="Report files: .xml, .xml.gz, or .zip.")
+    dmarc.add_argument(
+        "--policy",
+        choices=["none", "quarantine", "reject"],
+        default=None,
+        help="Current DMARC policy. Defaults to the policy inside the reports.",
+    )
+    dmarc.add_argument("--json", action="store_true", help="Print raw JSON output.")
+    dmarc.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default=None,
+    )
+    dmarc.add_argument("--sources", type=int, default=10, help="How many sending sources to list.")
+    dmarc.add_argument("--out", metavar="FILE", help="Write output to a file.")
+
     return parser
+
+
+def run_dmarc_reports(args: argparse.Namespace) -> int:
+    """Read report files from disk and print the rollout decision.
+
+    Exit code 1 when the next policy step is not safe yet, so this can gate a
+    deployment pipeline the same way ``audit`` does.
+    """
+    payloads: list[tuple[str, bytes]] = []
+    for raw_path in args.paths:
+        path = Path(raw_path)
+        if not path.is_file():
+            print(f"error: no such report file: {path}", file=sys.stderr)
+            return EXIT_ERROR
+        payloads.append((path.name, path.read_bytes()))
+
+    reports, errors = parse_reports(payloads)
+    for message in errors:
+        print(f"warning: {message}", file=sys.stderr)
+    if not reports:
+        print("error: no readable reports", file=sys.stderr)
+        return EXIT_ERROR
+
+    try:
+        summary = summarize_reports(reports)
+    except ReportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    readiness = assess_readiness(summary, current_policy=args.policy)
+
+    if resolve_format(args) == "json":
+        output = json.dumps(
+            {
+                "summary": summary.model_dump(mode="json"),
+                "readiness": readiness.model_dump(mode="json"),
+                "errors": errors,
+            },
+            indent=2,
+        )
+    else:
+        output = format_dmarc_text(summary, readiness, limit=max(1, args.sources))
+
+    write_output(output, getattr(args, "out", None))
+    return EXIT_PASS if readiness.ready else EXIT_FAIL
+
+
+def format_dmarc_text(summary, readiness, *, limit: int = 10) -> str:
+    domains = ", ".join(summary.domains) or "unknown domain"
+    window = f"{summary.window_start[:10]} to {summary.window_end[:10]}".strip()
+    lines = [
+        f"DMARC aggregate reports for {domains}",
+        f"  window        {window or 'unknown'}",
+        f"  reports       {summary.report_count} from {len(summary.reporters)} reporter(s)",
+        f"  messages      {summary.total_messages}",
+        f"  aligned pass  {summary.pass_rate:.1%} "
+        f"(DKIM {summary.dkim_aligned_rate:.1%}, SPF {summary.spf_aligned_rate:.1%})",
+        "",
+        f"Sending sources ({summary.source_count})",
+    ]
+    for source in summary.sources[:limit]:
+        lines.append(
+            f"  {source.source_ip:<39} {source.messages:>8} msg  "
+            f"{source.pass_rate:>6.1%} pass  {source.classification}"
+        )
+    if summary.source_count > limit:
+        lines.append(f"  ... and {summary.source_count - limit} more")
+
+    verdict = (
+        f"READY to move to p={readiness.recommended_policy}"
+        if readiness.ready
+        else f"NOT READY to leave p={readiness.current_policy}"
+    )
+    lines.extend(["", verdict])
+    for reason in readiness.reasons:
+        lines.append(f"  - {reason}")
+    if readiness.recommendations:
+        lines.append("")
+        lines.append("Next steps")
+        for rec in readiness.recommendations:
+            lines.append(f"  [{rec.severity}] {rec.message}")
+            if rec.details:
+                lines.append(f"          {rec.details}")
+    return "\n".join(lines)
 
 
 def resolve_settings(args: argparse.Namespace) -> Settings:

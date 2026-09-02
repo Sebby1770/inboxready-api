@@ -18,6 +18,7 @@ from inboxready_api.models import (
 )
 from inboxready_api.services.free_email import free_email_warning_message, is_free_email_domain
 from inboxready_api.services.provider_detection import detect_providers
+from inboxready_api.services.scoring import CHECK_WEIGHTS, STATUS_SCORE
 from inboxready_api.settings import Settings
 
 DMARC_REFERENCE = "https://dmarc.org/"
@@ -448,21 +449,9 @@ def extract_mailto_targets(raw_value: str | None) -> list[str]:
 
 
 def score_checks(checks: dict[str, AuditCheck]) -> int:
-    weights = {
-        "mx": 10,
-        "spf": 25,
-        "dmarc": 25,
-        "dkim": 20,
-        "mta_sts": 8,
-        "tls_rpt": 6,
-        "bimi": 6,
-    }
-    status_scores = {
-        "pass": 1.0,
-        "warn": 0.6,
-        "info": 0.5,
-        "fail": 0.0,
-    }
+    # Single source of truth, shared with the published /v1/scoring document.
+    weights = CHECK_WEIGHTS
+    status_scores = STATUS_SCORE
 
     # Only score core auth checks so optional advisories (e.g. free-email) don't distort totals.
     scored_keys = [key for key in weights if key in checks]

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import dns.resolver
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +20,7 @@ from inboxready_api.models import (
     CacheClearResponse,
     CompareRequest,
     CompareResponse,
+    DmarcReportResponse,
     DomainAuditRequest,
     DomainAuditResponse,
     ProviderCatalogResponse,
@@ -27,6 +28,13 @@ from inboxready_api.models import (
 from inboxready_api.security import require_api_access
 from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
+from inboxready_api.services.dmarc_reports import (
+    MAX_COMPRESSED_BYTES,
+    ReportError,
+    assess_readiness,
+    parse_reports,
+    summarize_reports,
+)
 from inboxready_api.services.dns_audit import audit_domain, normalize_domain
 from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.provider_detection import get_provider_catalog
@@ -262,6 +270,65 @@ def create_domain_compare(
     _auth: str = Depends(require_api_access),
 ) -> CompareResponse:
     return compare_domains(body, get_settings())
+
+
+#: Report uploads are bounded per request as well as per file, so a single
+#: multipart body cannot be used to exhaust memory.
+MAX_REPORT_FILES = 25
+MAX_REPORT_UPLOAD_BYTES = 32 * 1024 * 1024
+
+
+@app.post("/v1/dmarc/reports", response_model=DmarcReportResponse)
+async def analyze_dmarc_reports(
+    files: list[UploadFile] = File(
+        ...,
+        description="DMARC aggregate report files: XML, .xml.gz, or .zip.",
+    ),
+    policy: str | None = Query(
+        default=None,
+        pattern="^(none|quarantine|reject)$",
+        description="Current DMARC policy. Defaults to the policy inside the reports.",
+    ),
+    _auth: str = Depends(require_api_access),
+) -> DmarcReportResponse:
+    """Turn aggregate (RUA) reports into a rollout decision.
+
+    Answers the question a DNS lookup cannot: if the policy tightens, whose
+    mail breaks? Every source is classified, and the response says whether the
+    next policy step is safe and what stands in the way.
+    """
+    if len(files) > MAX_REPORT_FILES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Too many files. Upload at most {MAX_REPORT_FILES} reports per request.",
+        )
+
+    payloads: list[tuple[str, bytes]] = []
+    total = 0
+    for upload in files:
+        data = await upload.read(MAX_COMPRESSED_BYTES + 1)
+        await upload.close()
+        total += len(data)
+        if total > MAX_REPORT_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Upload exceeds the total size limit.")
+        payloads.append((upload.filename or "report", data))
+
+    reports, errors = parse_reports(payloads)
+    if not reports:
+        detail = errors[0] if errors else "No readable reports were supplied."
+        raise HTTPException(status_code=422, detail=detail)
+
+    try:
+        summary = summarize_reports(reports)
+    except ReportError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return DmarcReportResponse(
+        summary=summary,
+        readiness=assess_readiness(summary, current_policy=policy),
+        reports=[report.metadata for report in reports],
+        errors=errors,
+    )
 
 
 @app.get("/v1/scoring")

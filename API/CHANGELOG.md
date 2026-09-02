@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.6.0] — 2026-09-02
+
+Reading the reports, not just the records. A DNS audit says DMARC is
+published; it cannot say what happens when you enforce it. That answer lives
+in the aggregate (RUA) reports mailbox providers already send, as gzipped XML
+nobody opens.
+
+### Added
+- **DMARC aggregate report analysis** (`services/dmarc_reports.py`) — reads
+  RFC 7489 Appendix C reports from raw XML, gzip, or zip; merges reports
+  across reporters and windows; classifies every sending IP as
+  *authenticated*, *forwarded*, *SPF-only*, or *unauthenticated* from the
+  evaluated (alignment-aware) results.
+- **Rollout readiness gate** — says whether `p=none → quarantine → reject` is
+  safe yet and names the sources standing in the way. Forwarded mail never
+  blocks a rollout; SPF-only alignment is flagged as fragile because it does
+  not survive forwarding.
+- **`POST /v1/dmarc/reports`** — multipart upload of up to 25 report files,
+  returning the merged summary, per-source breakdown, and the readiness
+  verdict. Unreadable files are reported per file instead of failing the batch.
+- **`inboxready dmarc-reports FILE...`** — the same analysis from the command
+  line, exiting 1 when the next policy step is not safe, so it can gate a
+  pipeline.
+- **`/dmarc-reports` page** documenting the four source classifications, the
+  thresholds, and exactly what happens to an uploaded report.
+
+### Fixed
+- **The published scoring document did not match the scorer.** `/v1/scoring`
+  advertised MX at 15 points with a `warn` multiplier of 0.55, while the audit
+  actually used 10 and 0.6, so a customer could not reproduce their own score.
+  Both now read one table in `services/scoring.py`, and
+  `test_scoring_document_matches_the_scorer` recomputes a published score by
+  hand to keep them together.
+
+### Security
+- Report files are attacker-influenced input (anyone can email you one), so
+  uploads are bounded on compressed size, decompressed size, zip member count,
+  and record count, and any file declaring a DTD or XML entities is refused
+  before it reaches the parser. Reports are parsed in memory and not retained.
+
 ## [0.5.0] — 2026-08-24
 
 The public surface, brought up to the same standard the API holds other

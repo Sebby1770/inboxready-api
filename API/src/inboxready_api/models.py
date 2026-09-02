@@ -123,3 +123,100 @@ class CompareResponse(BaseModel):
 class CacheClearResponse(BaseModel):
     cleared: int
     message: str
+
+# --- DMARC aggregate (RUA) reports ------------------------------------------
+
+
+class DmarcReportMetadata(BaseModel):
+    org_name: str
+    email: str = ""
+    report_id: str = ""
+    begin: str = ""
+    end: str = ""
+    source_file: str = ""
+
+
+class DmarcPolicyPublished(BaseModel):
+    domain: str
+    policy: str = "none"
+    subdomain_policy: str | None = None
+    percentage: int = 100
+    dkim_alignment: str = "r"
+    spf_alignment: str = "r"
+
+
+class DmarcReportRow(BaseModel):
+    source_ip: str
+    count: int = Field(ge=0)
+    disposition: str = "none"
+    dkim: str = "fail"
+    spf: str = "fail"
+    header_from: str = ""
+    envelope_from: str = ""
+    dkim_domains: list[str] = Field(default_factory=list)
+    dkim_selectors: list[str] = Field(default_factory=list)
+    spf_domain: str = ""
+
+
+class DmarcAggregateReport(BaseModel):
+    metadata: DmarcReportMetadata
+    policy_published: DmarcPolicyPublished
+    rows: list[DmarcReportRow]
+
+
+class DmarcSource(BaseModel):
+    """One sending IP, merged across every report in the window."""
+
+    source_ip: str
+    messages: int
+    passing: int
+    failing: int
+    pass_rate: float = Field(ge=0.0, le=1.0)
+    volume_share: float = Field(ge=0.0, le=1.0)
+    dkim_aligned: int
+    spf_aligned: int
+    classification: str
+    classifications: dict[str, int] = Field(default_factory=dict)
+    dispositions: dict[str, int] = Field(default_factory=dict)
+    header_domains: list[str] = Field(default_factory=list)
+    dkim_domains: list[str] = Field(default_factory=list)
+    selectors: list[str] = Field(default_factory=list)
+    reporters: list[str] = Field(default_factory=list)
+
+
+class DmarcSummary(BaseModel):
+    domains: list[str] = Field(default_factory=list)
+    policies: list[str] = Field(default_factory=list)
+    reporters: list[str] = Field(default_factory=list)
+    report_count: int = 0
+    window_start: str = ""
+    window_end: str = ""
+    total_messages: int = 0
+    passing_messages: int = 0
+    failing_messages: int = 0
+    pass_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    dkim_aligned_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    spf_aligned_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    dispositions: dict[str, int] = Field(default_factory=dict)
+    source_count: int = 0
+    sources: list[DmarcSource] = Field(default_factory=list)
+
+
+class DmarcReadiness(BaseModel):
+    """Whether the next policy step is safe, and what stands in the way."""
+
+    current_policy: str
+    recommended_policy: str
+    ready: bool
+    threshold: float
+    reasons: list[str] = Field(default_factory=list)
+    blocking_sources: list[DmarcSource] = Field(default_factory=list)
+    fragile_sources: list[DmarcSource] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
+
+
+class DmarcReportResponse(BaseModel):
+    summary: DmarcSummary
+    readiness: DmarcReadiness
+    reports: list[DmarcReportMetadata] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)

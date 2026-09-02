@@ -139,6 +139,69 @@ def _product_context(request: Request) -> dict[str, Any]:
     }
 
 
+#: The four shapes a sending source can take, mirroring
+#: :data:`inboxready_api.services.dmarc_reports.CLASSIFICATIONS`.
+SOURCE_CLASSES: tuple[dict[str, str], ...] = (
+    {
+        "key": "authenticated",
+        "name": "Authenticated",
+        "shape": "Aligned DKIM and aligned SPF both pass.",
+        "detail": "Your own infrastructure, correctly set up. Nothing to do.",
+    },
+    {
+        "key": "forwarded",
+        "name": "Forwarded",
+        "shape": "Aligned DKIM passes, SPF fails.",
+        "detail": (
+            "A mailing list or forwarder rewrote the envelope. The signature survived, so this "
+            "already passes DMARC and will keep passing after you enforce."
+        ),
+    },
+    {
+        "key": "spf-only",
+        "name": "SPF-only",
+        "shape": "Aligned SPF passes, no aligned DKIM signature.",
+        "detail": (
+            "Passes today and breaks the first time a message is forwarded. Add DKIM signing "
+            "for this sender before tightening policy."
+        ),
+    },
+    {
+        "key": "unauthenticated",
+        "name": "Unauthenticated",
+        "shape": "Neither aligned mechanism passes.",
+        "detail": (
+            "Either a legitimate sender nobody authorised, or someone else sending as you. "
+            "With real volume behind it, this is what blocks a rollout."
+        ),
+    },
+)
+
+SAMPLE_DMARC_CLI = """\
+$ inboxready dmarc-reports reports/*.xml.gz
+DMARC aggregate reports for example.com
+  window        2026-01-01 to 2026-01-07
+  messages      48,210
+  aligned pass  98.4% (DKIM 97.9%, SPF 91.2%)
+
+NOT READY to leave p=none
+  - 1 source still fails DMARC with volume: 203.0.113.9 (742 msg)
+$ echo $?
+1"""
+
+
+def _dmarc_reports_context(request: Request) -> dict[str, Any]:
+    from inboxready_api.services import dmarc_reports
+
+    return {
+        "classifications": SOURCE_CLASSES,
+        "sample_cli": SAMPLE_DMARC_CLI,
+        "quarantine_threshold": f"{dmarc_reports.QUARANTINE_READY_RATE:.0%}",
+        "reject_threshold": f"{dmarc_reports.REJECT_READY_RATE:.0%}",
+        "blocker_share": f"{dmarc_reports.BLOCKER_MIN_SHARE:.1%}",
+    }
+
+
 def _pricing_context(request: Request) -> dict[str, Any]:
     return {"pricing_tiers": PRICING_TIERS, "featured_faqs": content.FAQS[-3:]}
 
@@ -162,6 +225,7 @@ def _legal_context(request: Request) -> dict[str, Any]:
 CONTEXT_BUILDERS: dict[str, Callable[[Request], dict[str, Any]]] = {
     "/": _home_context,
     "/product": _product_context,
+    "/dmarc-reports": _dmarc_reports_context,
     "/pricing": _pricing_context,
     "/about": _about_context,
     "/contact": _contact_context,

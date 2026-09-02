@@ -2,9 +2,11 @@
 
 InboxReady is a Python/FastAPI service that audits whether customer domains are ready to send trustworthy email.
 
-**Version:** 0.5.0 · **Site:** <https://sebby1770.github.io/inboxready-api/>
+**Version:** 0.6.0 · **Site:** <https://sebby1770.github.io/inboxready-api/>
 
 It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI; detects likely sending providers; returns a weighted readiness score and remediation guidance; and includes caching, optional API keys, rate limiting, domain compare, and markdown reports.
+
+It also reads the DMARC aggregate reports mailbox providers send back, which is the only way to answer the question that actually blocks a rollout: if the policy tightens, whose mail breaks?
 
 It also ships the marketing site around the API — twelve pages, structured data, a sitemap, and a contact form — because an audit product with an unfinished front door is a hard sell.
 
@@ -13,6 +15,7 @@ It also ships the marketing site around the API — twelve pages, structured dat
 ### The API
 
 - Single-domain and concurrent batch audits (up to 25 domains)
+- DMARC aggregate (RUA) report analysis with a policy-rollout verdict
 - Provider fingerprint catalog
 - Optional API keys (`X-API-Key`) and per-key/IP rate limiting
 - TTL response cache with `X-Cache: HIT|MISS`
@@ -21,7 +24,50 @@ It also ships the marketing site around the API — twelve pages, structured dat
 - Audit history with stats and CSV export, optionally persisted
 - Free / disposable mailbox domain warnings
 - Liveness (`/healthz`) and readiness (`/readyz`) probes
-- CLI: `inboxready` with formats, exit codes, and compare
+- CLI: `inboxready` with formats, exit codes, compare, and `dmarc-reports`
+
+### Reading DMARC reports (v0.6)
+
+A DNS lookup tells you DMARC is published. It cannot tell you what enforcement
+would do. The aggregate reports already arriving in your `rua` mailbox can.
+
+```bash
+inboxready dmarc-reports reports/*.xml.gz
+```
+
+```text
+DMARC aggregate reports for example.com
+  window        2026-01-01 to 2026-01-07
+  messages      48210
+  aligned pass  98.4% (DKIM 97.9%, SPF 91.2%)
+
+Sending sources (14)
+  192.0.2.10                     45120 msg  100.0% pass  authenticated
+  198.51.100.7                    2348 msg  100.0% pass  forwarded
+  203.0.113.9                      742 msg    0.0% pass  unauthenticated
+
+NOT READY to leave p=none
+  - 1 source still fails DMARC with volume: 203.0.113.9 (742 msg)
+```
+
+Every source is classified from the report's evaluated results, which already
+account for alignment:
+
+| Classification | Shape | What it means |
+| --- | --- | --- |
+| `authenticated` | aligned DKIM and SPF pass | your own infrastructure, set up correctly |
+| `forwarded` | aligned DKIM passes, SPF fails | a forwarder or list; already passes DMARC and will keep passing |
+| `spf-only` | aligned SPF passes, no aligned DKIM | passes today, breaks the first time it is forwarded |
+| `unauthenticated` | neither passes | unauthorised sender, or someone else sending as you |
+
+The readiness gate needs at least 100 reported messages, a 95% aligned pass
+rate for `quarantine` (99% for `reject`), and no unauthenticated source above
+0.1% of volume. The CLI exits 1 when the next step is not safe, so it can gate
+a pipeline. The same analysis is available at `POST /v1/dmarc/reports`.
+
+Report files are treated as untrusted input: compressed size, decompressed
+size, zip members, and record count are all bounded, DTD and entity
+declarations are refused, and nothing is written to disk.
 
 ### The site (v0.5)
 
