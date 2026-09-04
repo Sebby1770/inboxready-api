@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+from inboxready_api.validation import (
+    normalize_domain,
+    normalize_domains,
+    normalize_expected_providers,
+    normalize_selectors,
+)
 
 Status = Literal["pass", "warn", "fail", "info"]
 Severity = Literal["low", "medium", "high"]
@@ -37,15 +44,32 @@ class AuditCheck(BaseModel):
 
 
 class DomainAuditRequest(BaseModel):
-    domain: str = Field(description="The root domain to inspect.")
+    domain: str = Field(min_length=1, max_length=2048, description="The root domain to inspect.")
     selectors: list[str] = Field(
         default_factory=list,
+        max_length=20,
         description="Optional DKIM selectors to test explicitly.",
     )
     expected_providers: list[str] = Field(
         default_factory=list,
+        max_length=20,
         description="Optional provider names expected for this domain.",
     )
+
+    @field_validator("domain")
+    @classmethod
+    def canonical_domain(cls, value: str) -> str:
+        return normalize_domain(value)
+
+    @field_validator("selectors")
+    @classmethod
+    def canonical_selectors(cls, value: list[str]) -> list[str]:
+        return normalize_selectors(value)
+
+    @field_validator("expected_providers")
+    @classmethod
+    def canonical_expected_providers(cls, value: list[str]) -> list[str]:
+        return normalize_expected_providers(value)
 
 
 class DomainAuditResponse(BaseModel):
@@ -67,12 +91,29 @@ class BatchAuditRequest(BaseModel):
     )
     selectors: list[str] = Field(
         default_factory=list,
+        max_length=20,
         description="Optional DKIM selectors to test across every domain.",
     )
     expected_providers: list[str] = Field(
         default_factory=list,
+        max_length=20,
         description="Optional provider names expected across every domain.",
     )
+
+    @field_validator("domains")
+    @classmethod
+    def canonical_domains(cls, value: list[str]) -> list[str]:
+        return normalize_domains(value)
+
+    @field_validator("selectors")
+    @classmethod
+    def canonical_selectors(cls, value: list[str]) -> list[str]:
+        return normalize_selectors(value)
+
+    @field_validator("expected_providers")
+    @classmethod
+    def canonical_expected_providers(cls, value: list[str]) -> list[str]:
+        return normalize_expected_providers(value)
 
 
 class BatchAuditSummary(BaseModel):
@@ -97,8 +138,26 @@ class CompareRequest(BaseModel):
         max_length=10,
         description="Domains to compare side-by-side (2–10 unique after normalization).",
     )
-    selectors: list[str] = Field(default_factory=list)
-    expected_providers: list[str] = Field(default_factory=list)
+    selectors: list[str] = Field(default_factory=list, max_length=20)
+    expected_providers: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("domains")
+    @classmethod
+    def canonical_domains(cls, value: list[str]) -> list[str]:
+        normalized = normalize_domains(value)
+        if len(set(normalized)) < 2:
+            raise ValueError("At least two unique domains are required after normalization.")
+        return normalized
+
+    @field_validator("selectors")
+    @classmethod
+    def canonical_selectors(cls, value: list[str]) -> list[str]:
+        return normalize_selectors(value)
+
+    @field_validator("expected_providers")
+    @classmethod
+    def canonical_expected_providers(cls, value: list[str]) -> list[str]:
+        return normalize_expected_providers(value)
 
 
 class DomainScoreSummary(BaseModel):

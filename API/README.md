@@ -2,7 +2,7 @@
 
 InboxReady is a practical API-as-a-Service for verifying whether a customer domain is ready to send trustworthy email.
 
-**Version:** 0.5.0
+**Version:** 0.7.0
 
 ## Why This Idea
 
@@ -22,7 +22,13 @@ InboxReady turns that into one API call.
 - Detects likely sending providers from DNS evidence
 - Scores domain readiness from 0–100
 - Structured findings + actionable remediation guidance
-- Optional API keys (`X-API-Key`) and rate limiting
+- Constant-time API-key checks with hashed in-memory rate-limit identities
+- Trusted-proxy-aware client identity and rate-limit/reset response headers
+- Bounded request bodies, cache entries, rate-limit buckets, and audit inputs
+- RFC-aware MTA-STS fetches pinned to a vetted public address, with TLS SNI,
+  no redirects, strict policy validation, `text/plain` enforcement, and a
+  64 KiB response cap
+- Signed, retried low-score webhooks delivered as background tasks
 - TTL audit response cache (`X-Cache: HIT|MISS`)
 - Markdown reports (`?format=markdown` or `/v1/audit/{domain}/report.md`)
 - Domain compare (`POST /v1/compare`)
@@ -110,10 +116,18 @@ See [`.env.example`](./.env.example). Important production knobs:
 INBOXREADY_API_KEYS=key1,key2
 INBOXREADY_REQUIRE_API_KEY=false
 INBOXREADY_RATE_LIMIT_PER_MINUTE=60
+INBOXREADY_RATE_LIMIT_MAX_BUCKETS=20000
 INBOXREADY_CACHE_TTL_SECONDS=300
+INBOXREADY_CACHE_MAX_ENTRIES=2000
+INBOXREADY_REQUEST_BODY_MAX_BYTES=1048576
+INBOXREADY_REPORT_UPLOAD_BODY_MAX_BYTES=37748736
+INBOXREADY_TRUSTED_PROXY_CIDRS=
 ```
 
-When `INBOXREADY_API_KEYS` is non-empty (or `REQUIRE_API_KEY=true`), send `X-API-Key` on `/v1/*` routes. Missing/invalid keys return **401**; over-limit clients return **429**.
+When `INBOXREADY_API_KEYS` is non-empty, send `X-API-Key` on `/v1/*` routes.
+Missing/invalid keys return **401**; over-limit clients return **429** with
+`Retry-After`. `REQUIRE_API_KEY=true` fails closed with **503** if no keys were
+configured, and `/readyz` reports the same deployment error.
 
 ## Example Request
 
@@ -204,9 +218,17 @@ Exit codes: **0** pass, **1** fail overall, **2** error.
 
 ## Deploy Notes
 
-- Cache and rate limits are in-memory per process.
+- Cache, rate-limit state, history, and background webhook retries are in-process and bounded per process, not shared or durable across replicas.
 - Point load balancer liveness at `/healthz` and readiness at `/readyz`.
 - Set API keys before exposing a public production instance.
+- Configure `INBOXREADY_TRUSTED_PROXY_CIDRS` only with the actual reverse-proxy networks; all forwarding headers are ignored otherwise.
+- Webhook redirects and private targets are blocked by default. Validation is repeated before each attempt, but the HTTP connection performs its own DNS resolution; enforce network egress policy if tenant-controlled URLs must be supported.
+- MTA-STS policy hosts must resolve globally; redirects, non-`text/plain`
+  responses, oversized bodies, malformed discovery records, and invalid policy
+  fields are reported as warnings rather than accepted as configured security.
+  The fetch connects directly to the vetted address while preserving the
+  policy hostname for HTTP and TLS, preventing a second DNS lookup from
+  rebinding the request to an internal service.
 
 ## Local Development Note
 

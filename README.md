@@ -2,7 +2,7 @@
 
 InboxReady is a Python/FastAPI service that audits whether customer domains are ready to send trustworthy email.
 
-**Version:** 0.6.0 · **Site:** <https://sebby1770.github.io/inboxready-api/>
+**Version:** 0.7.0 · **Site:** <https://sebby1770.github.io/inboxready-api/>
 
 It checks MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, and BIMI; detects likely sending providers; returns a weighted readiness score and remediation guidance; and includes caching, optional API keys, rate limiting, domain compare, and markdown reports.
 
@@ -17,8 +17,12 @@ It also ships the marketing site around the API — twelve pages, structured dat
 - Single-domain and concurrent batch audits (up to 25 domains)
 - DMARC aggregate (RUA) report analysis with a policy-rollout verdict
 - Provider fingerprint catalog
-- Optional API keys (`X-API-Key`) and per-key/IP rate limiting
+- Constant-time API-key checks, hashed in-memory key identities, and per-key/IP rate limiting
+- Trusted-proxy-aware client identity and `RateLimit-*` / `Retry-After` response headers
 - TTL response cache with `X-Cache: HIT|MISS`
+- Bounded request bodies, cache entries, rate-limit buckets, selectors, and provider hints
+- Strict MTA-STS discovery/policy validation with bounded, no-redirect fetches
+- Signed, retried low-score webhooks delivered outside the API response path
 - Markdown / JSON / HTML audit reports
 - Side-by-side domain compare
 - Audit history with stats and CSV export, optionally persisted
@@ -123,14 +127,24 @@ Copy [`API/.env.example`](./API/.env.example). All settings use the `INBOXREADY_
 | `INBOXREADY_API_KEYS` | _(empty)_ | Comma-separated keys; when set, `X-API-Key` is required |
 | `INBOXREADY_REQUIRE_API_KEY` | `false` | Force key auth even with empty key list |
 | `INBOXREADY_RATE_LIMIT_PER_MINUTE` | `60` | Sliding window per key/IP (`0` disables) |
+| `INBOXREADY_RATE_LIMIT_MAX_BUCKETS` | `20000` | Maximum client buckets retained per process |
 | `INBOXREADY_CACHE_TTL_SECONDS` | `300` | Audit result TTL (`0` disables) |
+| `INBOXREADY_CACHE_MAX_ENTRIES` | `2000` | Maximum cached audits retained per process |
+| `INBOXREADY_REQUEST_BODY_MAX_BYTES` | `1048576` | Body limit for normal API/form requests |
+| `INBOXREADY_REPORT_UPLOAD_BODY_MAX_BYTES` | `37748736` | Multipart body limit for DMARC uploads |
 | `INBOXREADY_HTTP_TIMEOUT_SECONDS` | `5.0` | MTA-STS policy fetch timeout |
-| `INBOXREADY_USER_AGENT` | `InboxReady/0.2 ...` | Outbound User-Agent |
+| `INBOXREADY_USER_AGENT` | `InboxReady/0.7 ...` | Outbound User-Agent |
 | `INBOXREADY_BATCH_MAX_WORKERS` | `8` | Thread pool for batch audits |
 | `INBOXREADY_HISTORY_MAX_ENTRIES` | `500` | Audit history retained in memory |
 | `INBOXREADY_HISTORY_PATH` | _(empty)_ | Optional JSON file for audit history |
 | `INBOXREADY_WEBHOOK_URL` | _(empty)_ | Notified when a score falls below the floor |
 | `INBOXREADY_WEBHOOK_MIN_SCORE` | `70` | The score floor |
+| `INBOXREADY_WEBHOOK_SECRET` | _(empty)_ | HMAC-SHA256 signing secret |
+| `INBOXREADY_WEBHOOK_MAX_ATTEMPTS` | `3` | Attempts for transient delivery failures |
+| `INBOXREADY_WEBHOOK_TIMEOUT_SECONDS` | `3` | Timeout for each attempt |
+| `INBOXREADY_WEBHOOK_ALLOW_PRIVATE_HOSTS` | `false` | Permit intentionally internal receivers |
+| `INBOXREADY_TRUSTED_PROXY_CIDRS` | _(empty)_ | Proxies allowed to supply `X-Forwarded-For` |
+| `INBOXREADY_ACCESS_LOG_ENABLED` | `true` | Structured request events without bodies or queries |
 | `INBOXREADY_ENVIRONMENT` | `development` | Only `production` is crawlable |
 | `INBOXREADY_SITE_BASE_URL` | _(empty)_ | Absolute origin for canonicals, sitemap, `og:image` |
 | `INBOXREADY_ANALYTICS_GA4_ID` | _(empty)_ | GA4 measurement ID; empty serves no analytics |
@@ -195,6 +209,38 @@ inboxready compare a.com b.com
 
 Exit codes: `0` pass, `1` overall fail, `2` error.
 
+## Production behaviour (v0.7)
+
+All audit inputs are canonicalized before DNS resolution. HTTP(S) domain URLs
+remain supported, while credentials, ports, IP literals, malformed DNS labels,
+oversized selector/provider lists, and over-limit request bodies return a
+bounded JSON error. Client-supplied request IDs are accepted only when they use
+a safe 128-character alphabet; otherwise the service creates a UUID.
+
+MTA-STS discovery now requires exactly one valid `v=STSv1` TXT record with an
+ID. Policy retrieval pins the connection to a vetted public address while
+preserving the original hostname for HTTP and TLS, accepts only a direct `200`,
+refuses redirects and non-`text/plain` responses, caps the decoded body at 64
+KiB, and validates `version`, `mode`, `max_age`, and MX patterns before an
+enforcement policy can pass.
+
+Rate-limited responses include `Retry-After`; successful authenticated routes
+include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` (plus
+the common `X-RateLimit-*` forms). Forwarding headers are ignored unless the
+direct peer matches `INBOXREADY_TRUSTED_PROXY_CIDRS`, and multi-hop chains are
+walked from the trusted edge inward.
+
+Low-score webhook deliveries carry `X-InboxReady-Event`, a stable
+`X-InboxReady-Delivery` ID, and—when `INBOXREADY_WEBHOOK_SECRET` is set—an
+`X-InboxReady-Signature-256: sha256=...` signature over the exact request body.
+Delivery runs as an in-process background task with bounded exponential retry;
+redirects and private/non-global resolved addresses are refused by default.
+Set `INBOXREADY_WEBHOOK_ALLOW_PRIVATE_HOSTS=true` only for a deliberately
+internal receiver. DNS safety is checked before each attempt, but the standard
+HTTP transport resolves again when connecting, so this is not connection-pinned
+protection against DNS rebinding. Use fixed egress/DNS policy when webhook URLs
+can be configured by untrusted tenants.
+
 ## Test
 
 ```bash
@@ -231,7 +277,7 @@ backend, so the audit and contact forms explain themselves rather than failing
 - **Set `INBOXREADY_SITE_BASE_URL`**, or canonical URLs and the sitemap will
   point at whatever origin the request arrived on.
 - Prefer setting `INBOXREADY_API_KEYS` and a sensible `INBOXREADY_RATE_LIMIT_PER_MINUTE` in production.
-- Cache and rate limits are **in-process** (per instance). Multi-instance deploys need sticky sessions or an external store for strict global limits.
+- Cache, rate limits, history, and webhook retries are **in-process** (per instance). They are bounded, but multi-instance deploys need shared external stores/queues for strict global limits and durable webhook delivery.
 - Health checks: liveness → `/healthz`, readiness → `/readyz`.
 - Render: see [`render.yaml`](./render.yaml).
 

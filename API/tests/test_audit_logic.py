@@ -52,6 +52,14 @@ def test_parse_mta_sts_policy_supports_multiple_mx_lines() -> None:
     assert policy["max_age"] == "86400"
 
 
+def test_parse_mta_sts_policy_keeps_first_non_repeated_field() -> None:
+    policy = parse_mta_sts_policy(
+        "version: STSv1\nmode: testing\nmode: enforce\nmx: mx.example.com\nmax_age: 86400"
+    )
+
+    assert policy["mode"] == "testing"
+
+
 def test_detect_providers_uses_dns_evidence() -> None:
     providers = detect_providers(
         [
@@ -103,7 +111,7 @@ def test_unique_normalized_domains_keeps_first_seen_order() -> None:
 
 def test_normalize_domain_strips_scheme_path_and_case() -> None:
     assert normalize_domain("HTTPS://Mail.Example.COM/path?q=1") == "mail.example.com"
-    assert normalize_domain("  example.com. ") == "example.com."
+    assert normalize_domain("  example.com. ") == "example.com"
     assert normalize_domain("example.com") == "example.com"
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import OrderedDict
 from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
@@ -10,9 +11,16 @@ T = TypeVar("T")
 class TTLCache(Generic[T]):
     """Simple thread-safe TTL cache."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_entries: int = 2_000) -> None:
         self._lock = threading.Lock()
-        self._store: dict[str, tuple[float, T]] = {}
+        self._max_entries = max(1, max_entries)
+        self._store: OrderedDict[str, tuple[float, T]] = OrderedDict()
+
+    def configure(self, *, max_entries: int) -> None:
+        with self._lock:
+            self._max_entries = max(1, max_entries)
+            while len(self._store) > self._max_entries:
+                self._store.popitem(last=False)
 
     def get(self, key: str) -> T | None:
         now = time.monotonic()
@@ -24,6 +32,7 @@ class TTLCache(Generic[T]):
             if expires_at <= now:
                 del self._store[key]
                 return None
+            self._store.move_to_end(key)
             return value
 
     def set(self, key: str, value: T, ttl_seconds: float) -> None:
@@ -31,7 +40,10 @@ class TTLCache(Generic[T]):
             return
         expires_at = time.monotonic() + ttl_seconds
         with self._lock:
+            self._store.pop(key, None)
             self._store[key] = (expires_at, value)
+            while len(self._store) > self._max_entries:
+                self._store.popitem(last=False)
 
     def clear(self) -> int:
         with self._lock:

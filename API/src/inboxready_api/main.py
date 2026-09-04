@@ -1,19 +1,37 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import dns.resolver
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from inboxready_api import __version__
 from inboxready_api.cache import audit_cache, make_audit_cache_key
-from inboxready_api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
+from inboxready_api.middleware import (
+    ObservabilityMiddleware,
+    RateLimitHeadersMiddleware,
+    RequestBodyLimitMiddleware,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from inboxready_api.models import (
     BatchAuditRequest,
     BatchAuditResponse,
@@ -25,7 +43,7 @@ from inboxready_api.models import (
     DomainAuditResponse,
     ProviderCatalogResponse,
 )
-from inboxready_api.security import require_api_access
+from inboxready_api.security import rate_limiter, require_api_access
 from inboxready_api.services.batch_audit import audit_domains
 from inboxready_api.services.compare import compare_domains
 from inboxready_api.services.dmarc_reports import (
@@ -40,11 +58,13 @@ from inboxready_api.services.history import configure_history, get_history
 from inboxready_api.services.provider_detection import get_provider_catalog
 from inboxready_api.services.report import render_html_report, render_markdown_report
 from inboxready_api.services.scoring import scoring_document
+from inboxready_api.services.webhook import deliver_webhook
 from inboxready_api.settings import get_settings
 from inboxready_api.site import router as site_router
 from inboxready_api.site.leads import configure_leads
 
 BASE_DIR = Path(__file__).resolve().parent
+logger = logging.getLogger("inboxready_api")
 
 #: Prefixes that must answer with JSON even when something goes wrong. Serving
 #: an HTML 404 to a client that asked for JSON is a debugging trap.
@@ -62,6 +82,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         max_entries=settings.leads_max_entries,
         path=settings.leads_path or None,
     )
+    audit_cache.configure(max_entries=settings.cache_max_entries)
+    rate_limiter.configure(max_buckets=settings.rate_limit_max_buckets)
     yield
 
 
@@ -78,6 +100,9 @@ app = FastAPI(
 )
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitHeadersMiddleware)
+app.add_middleware(RequestBodyLimitMiddleware)
+app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(RequestIdMiddleware)
 app.include_router(site_router.router)
 
@@ -105,7 +130,18 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> Response:
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    return JSONResponse(
+        status_code=422,
+        content={"detail": _validation_errors(exc.errors())},
+    )
+
+
+def _validation_errors(errors: list[dict]) -> list[dict]:
+    """Keep validation responses JSON-safe without exposing exception objects."""
+    return [
+        {key: value for key, value in error.items() if key not in {"ctx", "url"}}
+        for error in errors
+    ]
 
 
 def _run_cached_audit(request: DomainAuditRequest) -> tuple[DomainAuditResponse, str]:
@@ -147,19 +183,24 @@ def healthz() -> dict[str, str]:
 @app.get("/readyz")
 def readyz() -> JSONResponse:
     try:
+        settings = get_settings()
+        if settings.require_api_key and not settings.parsed_api_keys:
+            raise RuntimeError("API key authentication is required but has no configured keys")
         resolver = dns.resolver.Resolver()
-        _ = resolver.nameservers
+        if not resolver.nameservers:
+            raise RuntimeError("DNS resolver has no nameservers")
         return JSONResponse(
             status_code=200,
             content={"status": "ready", "version": __version__},
         )
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("readiness check failed")
         return JSONResponse(
             status_code=503,
             content={
                 "status": "not_ready",
                 "version": __version__,
-                "detail": str(exc),
+                "detail": "A required service or production setting is unavailable.",
             },
         )
 
@@ -169,7 +210,7 @@ def list_providers(_auth: str = Depends(require_api_access)) -> ProviderCatalogR
     return ProviderCatalogResponse(providers=get_provider_catalog())
 
 
-def _record_audit(result, cache_status: str) -> None:
+def _record_audit(result, cache_status: str, background_tasks: BackgroundTasks) -> None:
     get_history().add(
         domain=result.domain,
         score=result.score,
@@ -177,42 +218,29 @@ def _record_audit(result, cache_status: str) -> None:
         checked_at=result.checked_at,
         cached=cache_status == "HIT",
     )
-    _maybe_webhook(result)
+    _maybe_webhook(result, background_tasks)
 
 
-def _maybe_webhook(result) -> None:
+def _maybe_webhook(result, background_tasks: BackgroundTasks) -> None:
     settings = get_settings()
     if not settings.webhook_url:
         return
     if result.score >= settings.webhook_min_score:
         return
-    try:
-        import httpx
-
-        httpx.post(
-            settings.webhook_url,
-            json={
-                "domain": result.domain,
-                "score": result.score,
-                "overall_status": result.overall_status,
-                "checked_at": result.checked_at,
-            },
-            timeout=2.0,
-        )
-    except Exception:
-        pass
+    background_tasks.add_task(deliver_webhook, result, settings)
 
 
 @app.post("/v1/audits/email-domain", response_model=None)
 def create_email_domain_audit(
     body: DomainAuditRequest,
+    background_tasks: BackgroundTasks,
     response: Response,
     format: str = Query(default="json", pattern="^(json|markdown|md|html)$"),
     _auth: str = Depends(require_api_access),
 ):
     result, cache_status = _run_cached_audit(body)
     response.headers["X-Cache"] = cache_status
-    _record_audit(result, cache_status)
+    _record_audit(result, cache_status, background_tasks)
 
     if format in {"markdown", "md"}:
         return PlainTextResponse(
@@ -241,13 +269,15 @@ def get_markdown_report(
 ) -> PlainTextResponse:
     selector_list = [item.strip() for item in selectors.split(",") if item.strip()]
     provider_list = [item.strip() for item in expected_providers.split(",") if item.strip()]
-    result, cache_status = _run_cached_audit(
-        DomainAuditRequest(
+    try:
+        audit_request = DomainAuditRequest(
             domain=domain,
             selectors=selector_list,
             expected_providers=provider_list,
         )
-    )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=_validation_errors(exc.errors())) from exc
+    result, cache_status = _run_cached_audit(audit_request)
     response.headers["X-Cache"] = cache_status
     return PlainTextResponse(
         content=render_markdown_report(result),

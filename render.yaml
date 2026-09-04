@@ -14,7 +14,7 @@ services:
       - key: INBOXREADY_HTTP_TIMEOUT_SECONDS
         value: 5.0
       - key: INBOXREADY_USER_AGENT
-        value: InboxReady/0.6 (+https://github.com/Sebby1770/inboxready-api)
+        value: InboxReady/0.7 (+https://github.com/Sebby1770/inboxready-api)
       # Makes the site crawlable and marks pages index,follow. Anything other
       # than "production" serves a blanket robots.txt disallow instead.
       - key: INBOXREADY_ENVIRONMENT

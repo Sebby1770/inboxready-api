@@ -200,7 +200,7 @@ def test_require_api_key_without_configured_keys(monkeypatch) -> None:
     get_settings.cache_clear()
 
     response = client.get("/v1/providers")
-    assert response.status_code == 401
+    assert response.status_code == 503
 
 
 def test_rate_limit_returns_429(monkeypatch) -> None:

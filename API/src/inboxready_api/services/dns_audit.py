@@ -17,13 +17,24 @@ from inboxready_api.models import (
     Recommendation,
 )
 from inboxready_api.services.free_email import free_email_warning_message, is_free_email_domain
+from inboxready_api.services.outbound import UnsafeOutboundTarget, resolve_public_http_target
 from inboxready_api.services.provider_detection import detect_providers
 from inboxready_api.services.scoring import CHECK_WEIGHTS, STATUS_SCORE
 from inboxready_api.settings import Settings
+from inboxready_api.validation import normalize_domain
 
 DMARC_REFERENCE = "https://dmarc.org/"
 GOOGLE_REFERENCE = "https://support.google.com/a/answer/81126?hl=en-AL"
 YAHOO_REFERENCE = "https://senders.yahooinc.com/faqs/"
+
+# RFC 8461 section 3.3 recommends capping fetched policy files at 64 KiB.
+# The limit applies to decoded response bytes so HTTP compression cannot turn
+# an otherwise small transfer into unbounded process memory.
+MAX_MTA_STS_POLICY_BYTES = 64 * 1024
+MAX_MTA_STS_MAX_AGE = 31_557_600
+_MTA_STS_FIELD_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$")
+_MTA_STS_ID = re.compile(r"^[A-Za-z0-9]{1,32}$")
+_MTA_STS_TXT_VALUE = re.compile(r"^[\x21-\x3A\x3C\x3E-\x7E]+$")
 
 
 def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAuditResponse:
@@ -105,15 +116,6 @@ def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAudit
         recommendations=dedupe_recommendations(recommendations),
         references=[DMARC_REFERENCE, GOOGLE_REFERENCE, YAHOO_REFERENCE],
     )
-
-
-def normalize_domain(value: str) -> str:
-    domain = value.strip().lower()
-    domain = re.sub(r"^https?://", "", domain)
-    domain = domain.strip("/")
-    if "/" in domain:
-        domain = domain.split("/", maxsplit=1)[0]
-    return domain
 
 
 def query_records(
@@ -322,13 +324,26 @@ def build_dkim_check(
 
 
 def build_mta_sts_check(domain: str, records: list[str], settings: Settings) -> AuditCheck:
-    valid_records = [record for record in records if record.lower().startswith("v=stsv1")]
-
-    if not valid_records:
+    if not records:
         return AuditCheck(
             status="info",
             summary="No MTA-STS TXT record found.",
             details={"records": []},
+        )
+
+    evaluated_records = [
+        {"record": record, "errors": validate_mta_sts_txt_record(record)}
+        for record in records
+    ]
+    valid_records = [item["record"] for item in evaluated_records if not item["errors"]]
+    if len(valid_records) != 1:
+        return AuditCheck(
+            status="warn",
+            summary=(
+                "MTA-STS TXT records are present, but exactly one syntactically valid record "
+                "is required."
+            ),
+            details={"records": evaluated_records, "valid_record_count": len(valid_records)},
         )
 
     record = valid_records[0]
@@ -337,21 +352,83 @@ def build_mta_sts_check(domain: str, records: list[str], settings: Settings) -> 
     details["policy_url"] = policy_url
 
     try:
-        with httpx.Client(
-            timeout=settings.http_timeout_seconds,
-            headers={"User-Agent": settings.user_agent},
-            follow_redirects=True,
-        ) as client:
-            response = client.get(policy_url)
+        target = resolve_public_http_target(policy_url)
+        with (
+            httpx.Client(
+                timeout=settings.http_timeout_seconds,
+                headers={
+                    "Host": target.host_header,
+                    "User-Agent": settings.user_agent,
+                },
+                # RFC 8461 section 3.3 explicitly forbids following redirects.
+                follow_redirects=False,
+                # A proxy could re-resolve the hostname and defeat address
+                # pinning, so security-sensitive policy fetches connect direct.
+                trust_env=False,
+            ) as client,
+            client.stream(
+                "GET",
+                target.pinned_url(),
+                extensions={"sni_hostname": target.hostname},
+            ) as response,
+        ):
             if response.status_code == 200:
-                policy = parse_mta_sts_policy(response.text)
+                details["policy_fetch_status"] = 200
+                content_type = response.headers.get("content-type", "")
+                media_type = content_type.split(";", maxsplit=1)[0].strip().lower()
+                details["policy_content_type"] = content_type or None
+                if media_type != "text/plain":
+                    details["policy_fetch_error"] = (
+                        "policy response must use the text/plain media type"
+                    )
+                    return AuditCheck(
+                        status="warn",
+                        summary=(
+                            "MTA-STS TXT record exists, but the policy response is not "
+                            "served as text/plain."
+                        ),
+                        details=details,
+                    )
+                body = bytearray()
+                for chunk in response.iter_bytes():
+                    if len(body) + len(chunk) > MAX_MTA_STS_POLICY_BYTES:
+                        details["policy_fetch_error"] = "policy file exceeds 64 KiB"
+                        return AuditCheck(
+                            status="warn",
+                            summary=(
+                                "MTA-STS TXT record exists, but the policy file is too large "
+                                "to verify safely."
+                            ),
+                            details=details,
+                        )
+                    body.extend(chunk)
+                try:
+                    policy_text = bytes(body).decode("utf-8")
+                except UnicodeDecodeError:
+                    details["policy_fetch_error"] = "policy file is not valid UTF-8"
+                    return AuditCheck(
+                        status="warn",
+                        summary="MTA-STS TXT record exists, but the policy file is not valid UTF-8.",
+                        details=details,
+                    )
+                policy = parse_mta_sts_policy(policy_text)
                 details["policy"] = policy
+                policy_errors = validate_mta_sts_policy(policy)
+                if policy_errors:
+                    details["policy_errors"] = policy_errors
+                    return AuditCheck(
+                        status="warn",
+                        summary="MTA-STS policy file is present but syntactically invalid.",
+                        details=details,
+                    )
                 status = "pass" if policy.get("mode") == "enforce" else "warn"
                 summary = "MTA-STS record and policy file found."
                 if status == "warn":
                     summary = "MTA-STS exists but is not in enforce mode."
                 return AuditCheck(status=status, summary=summary, details=details)
             details["policy_fetch_status"] = response.status_code
+    except UnsafeOutboundTarget as exc:
+        details["policy_fetch_error"] = str(exc)
     except httpx.HTTPError as exc:
         details["policy_fetch_error"] = str(exc)
 
@@ -372,9 +449,99 @@ def parse_mta_sts_policy(policy_text: str) -> dict[str, object]:
         value = value.strip()
         if key == "mx":
             parsed.setdefault("mx", []).append(value)
-        else:
+        elif key not in parsed:
+            # RFC 8461 requires duplicate non-MX fields after the first to be
+            # ignored rather than allowed to rewrite the effective policy.
             parsed[key] = value
     return parsed
+
+
+def validate_mta_sts_txt_record(record: str) -> list[str]:
+    """Return RFC 8461 discovery-record errors without raising."""
+    errors: list[str] = []
+    raw_segments = record.split(";")
+    if raw_segments and not raw_segments[-1].strip():
+        raw_segments.pop()  # one optional trailing delimiter is legal
+    if any(not segment.strip() for segment in raw_segments):
+        errors.append("record contains an empty field")
+    segments = [segment.strip() for segment in raw_segments if segment.strip()]
+    if not segments or segments[0] != "v=STSv1":
+        errors.append("record must begin with the exact v=STSv1 field")
+
+    fields: dict[str, str] = {}
+    for segment in segments:
+        if "=" not in segment:
+            errors.append(f"field is missing '=': {segment[:32]}")
+            continue
+        key, value = segment.split("=", maxsplit=1)
+        if not _MTA_STS_FIELD_NAME.fullmatch(key):
+            errors.append(f"invalid field name: {key[:32]}")
+            continue
+        if not _MTA_STS_TXT_VALUE.fullmatch(value):
+            errors.append(f"invalid value for field: {key[:32]}")
+            continue
+        fields.setdefault(key, value)
+
+    identifier = fields.get("id", "")
+    if not _MTA_STS_ID.fullmatch(identifier):
+        errors.append("id must contain 1-32 ASCII letters or digits")
+    return errors
+
+
+def validate_mta_sts_policy(policy: dict[str, object]) -> list[str]:
+    """Validate the required MTA-STS policy fields and MX pattern grammar."""
+    errors: list[str] = []
+    raw = str(policy.get("raw", ""))
+    for line_number, line in enumerate(raw.splitlines(), start=1):
+        if not line.strip() or ":" not in line:
+            errors.append(f"line {line_number} is not a key/value field")
+            continue
+        key, value = line.split(":", maxsplit=1)
+        key = key.strip()
+        value = value.strip()
+        if not _MTA_STS_FIELD_NAME.fullmatch(key):
+            errors.append(f"line {line_number} has an invalid field name")
+        if key.lower() in {"version", "mode", "mx", "max_age"} and key != key.lower():
+            errors.append(f"line {line_number} must use lowercase field name {key.lower()}")
+        if not value or any(ord(character) < 32 for character in value):
+            errors.append(f"line {line_number} has an invalid field value")
+
+    if policy.get("version") != "STSv1":
+        errors.append("version must be STSv1")
+
+    mode = policy.get("mode")
+    if mode not in {"enforce", "testing", "none"}:
+        errors.append("mode must be enforce, testing, or none")
+
+    max_age = policy.get("max_age")
+    if not isinstance(max_age, str) or not re.fullmatch(r"[0-9]{1,10}", max_age):
+        errors.append("max_age must be a non-negative integer of at most 10 digits")
+    elif int(max_age) > MAX_MTA_STS_MAX_AGE:
+        errors.append(f"max_age must not exceed {MAX_MTA_STS_MAX_AGE}")
+
+    raw_patterns = policy.get("mx", [])
+    patterns = raw_patterns if isinstance(raw_patterns, list) else []
+    if mode != "none" and not patterns:
+        errors.append("at least one mx pattern is required unless mode is none")
+    for pattern in patterns:
+        if not isinstance(pattern, str) or not _valid_mta_sts_mx_pattern(pattern):
+            errors.append(f"invalid mx pattern: {str(pattern)[:64]}")
+    return errors
+
+
+def _valid_mta_sts_mx_pattern(pattern: str) -> bool:
+    try:
+        pattern.encode("ascii")
+    except UnicodeEncodeError:
+        return False
+    hostname = pattern[2:] if pattern.startswith("*.") else pattern
+    if not hostname or "*" in hostname:
+        return False
+    try:
+        normalized = normalize_domain(hostname)
+    except ValueError:
+        return False
+    return normalized == hostname.rstrip(".").lower()
 
 
 def build_tls_rpt_check(records: list[str]) -> AuditCheck:

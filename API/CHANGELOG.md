@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.7.0] — 2026-09-04
+
+A production-boundary release: the audit engine and v0.6 DMARC intelligence
+remain API-compatible, while hostile input, client identity, memory growth,
+webhook delivery, and failure diagnostics now have explicit policies.
+
+### Added
+- Canonical IDNA domain validation before DNS/HTTP work, plus bounded and
+  deduplicated DKIM selectors and expected-provider hints.
+- Configurable request-envelope limits for normal requests and the larger
+  DMARC multipart route. Declared and chunked bodies both receive JSON `413`.
+- `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers on
+  accepted API calls, with `Retry-After` on `429` responses.
+- Explicit trusted-proxy CIDRs with right-to-left `X-Forwarded-For` chain
+  evaluation. Forwarding headers remain ignored by default.
+- Structured request events containing request ID, method, path, status,
+  duration, and a one-way client hash—never headers, query strings, or bodies.
+- Signed webhook events (`X-InboxReady-Signature-256`), stable delivery IDs,
+  bounded retries for transient failures, and configurable timeouts.
+
+### Changed
+- API keys use constant-time comparison, and only SHA-256 key identities are
+  retained in rate-limit state. Arbitrary key headers can no longer bypass an
+  open deployment's IP bucket.
+- Audit cache entries and rate-limit client buckets are LRU-bounded.
+- Low-score webhooks run after the response and refuse redirects plus
+  private/non-global targets unless explicitly enabled. Target DNS is checked
+  before every attempt; the default HTTP transport still resolves on connect,
+  so operators accepting tenant-controlled URLs must also enforce egress policy
+  against DNS rebinding.
+- MTA-STS discovery now requires one valid versioned TXT record. Policy fetches
+  pin the connection to a vetted public address (with the original HTTP Host
+  and TLS SNI), reject redirects and non-plain-text responses, and cap bodies
+  at 64 KiB; required fields, maximum age, and MX patterns are validated before
+  `enforce` can pass.
+- `/readyz` fails closed when authentication is required without configured
+  keys, and no longer returns internal exception text.
+- Untrusted request IDs are syntax/length checked before response reflection.
+
+### Compatibility
+- Existing endpoints, successful response bodies, API-key header, domain URL
+  shorthand, scoring, and CLI commands are preserved. Trailing-dot domains are
+  canonicalized to the equivalent non-dot hostname.
+
 ## [0.6.0] — 2026-09-02
 
 Reading the reports, not just the records. A DNS audit says DMARC is
