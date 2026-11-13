@@ -30,6 +30,7 @@
       rel="stylesheet"
       href="{{ url_for('static', path='css/site.css') }}"
     />
+    <link rel="stylesheet" href="{{ url_for('static', path='css/launch.css') }}" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -48,34 +49,28 @@
       }
     </script>
     <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
+    <script defer src="{{ url_for('static', path='js/launch.js') }}"></script>
   </head>
   <body class="{{ body_class|default('') }}">
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <div class="site-shell">
       <header class="site-header">
         <a class="brand" href="/">
-          <span class="brand-mark">IR</span>
+          <span class="brand-mark" aria-hidden="true">↗</span>
           <span class="brand-copy">
             <strong>InboxReady</strong>
-            <span>Domain readiness for sender-facing SaaS</span>
           </span>
         </a>
 
-        <nav class="site-nav" aria-label="Primary">
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+        <nav class="site-nav" id="primary-nav" aria-label="Primary">
           <a href="/#product">Product</a>
-          <a href="/#workflow">Workflow</a>
+          <a href="/#workflow">Developers</a>
           <a href="/#pricing">Pricing</a>
-          <a href="/#faq">FAQ</a>
-          <a href="/ops">Ops</a>
-          <a href="/support">Support</a>
           <a href="/changelog">Changelog</a>
-          <a href="/docs">API Docs</a>
         </nav>
 
         <div class="header-actions">
-          <span class="header-status" data-health-indicator>
-            <span class="status-dot"></span>
-            Checking API
-          </span>
           {% if current_account %}
           <a class="button button-secondary" href="/dashboard">Dashboard</a>
           <form method="post" action="/logout" class="inline-form">
@@ -89,7 +84,7 @@
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         {% if flash %}
         <div class="flash-wrap">
           <div class="flash flash-{{ flash.kind }}">{{ flash.message }}</div>
@@ -102,7 +97,7 @@
         <div class="footer-grid">
           <div>
             <div class="footer-brand">
-              <span class="brand-mark">IR</span>
+              <span class="brand-mark" aria-hidden="true">↗</span>
               <strong>InboxReady</strong>
             </div>
             <p>
@@ -124,7 +119,6 @@
             <a href="/docs">OpenAPI Docs</a>
             <a href="/api">API Metadata</a>
             <a href="/ops">Operations</a>
-            <a href="/metrics">Metrics</a>
             <a href="/healthz">Health Check</a>
             <a href="/readyz">Readiness Check</a>
           </div>
@@ -138,6 +132,7 @@
             <a href="mailto:{{ support_email }}">{{ support_email }}</a>
           </div>
         </div>
+        <div class="footer-bottom"><span>InboxReady · Built for better beginnings.</span><span class="header-status" data-health-indicator><span class="status-dot"></span>Checking API</span></div>
       </footer>
     </div>
   </body>

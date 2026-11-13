@@ -2,6 +2,31 @@
 
 All notable product-facing changes to InboxReady are tracked here.
 
+## 1.1.0 - 2026-11-13
+
+### Added
+
+- Redesigned homepage with a free domain-check entry point, clearly labeled example report, interactive protocol explorer, code-language switcher, copy controls, and accessible FAQ disclosure.
+- Plan recommendation tool backed by enforced audit quotas, with plan choices retained through signup and sign-in.
+- Dashboard getting-started checklist, one-time key copy, password visibility control, responsive navigation, and reduced-motion support.
+- Launch guide covering payment activation, persistent hosting, first-customer acquisition, and outstanding integration setup.
+
+### Improved
+
+- Pricing describes shipped capabilities and hard usage limits rather than future features, SLA promises, or unimplemented overages.
+- Checkout and billing portal return to the dashboard; existing subscriptions cannot create a second checkout subscription.
+- Checkout requires a configured Stripe key, webhook secret and plan price ID. Payment-return messaging waits for webhook confirmation.
+- Browser-storage failures no longer hide successful audit results; code examples use the configured API origin.
+- Render's single-instance Blueprint mounts a persistent disk for accounts and audit exports. Vercel is documented as a disposable preview until storage is migrated.
+
+### Security
+
+- API and browser signup both respect the public signup switch. A dashboard link alone cannot spend an account's audit quota.
+- Queued audits have a single execution owner, so repeated run requests return job status rather than duplicating usage.
+- Audit requests accept up to ten DKIM selectors; per-domain DNS query counts and lookup time are bounded.
+- Policy fetches pin a verified public IP for every redirect while preserving TLS hostname checks. Responses have a size cap.
+- Metrics aggregate unmatched paths and unknown methods under fixed labels and cap the total number of route labels.
+
 ## 1.0.0 - 2026-07-01
 
 ### Added

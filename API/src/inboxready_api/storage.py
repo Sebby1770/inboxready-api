@@ -674,7 +674,7 @@ class Storage:
         self.init_schema()
         now = utc_now()
         with self.connect() as conn:
-            conn.execute(
+            claim = conn.execute(
                 """
                 UPDATE audit_jobs
                 SET status = 'running', started_at = COALESCE(started_at, ?)
@@ -682,6 +682,9 @@ class Storage:
                 """,
                 (now, account_id, job_id),
             )
+            # Only the winner of the queued -> running transition may execute.
+            if claim.rowcount != 1:
+                return None
         return self.get_audit_job(account_id=account_id, job_id=job_id)
 
     def complete_audit_job(

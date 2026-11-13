@@ -5,13 +5,10 @@
   <div class="section-heading compact" data-reveal>
     <p class="section-kicker">Workspace</p>
     <h1>
-      Audit a domain, review the recommendations, and inspect the raw JSON in
-      one place.
+      Is your domain ready to send?
     </h1>
     <p>
-      This is the operator-facing surface for the same API that powers the
-      landing page. It is useful for demos, support, internal ops, and
-      design-partner onboarding.
+      Enter a sending domain for a live check of its email configuration. Add your provider's DKIM selectors for a more complete report.
     </p>
   </div>
 </section>
@@ -85,18 +82,16 @@
       <a class="button button-secondary" href="/docs">Open API Schema</a>
     </div>
 
-    <div class="result-shell tall" id="workspace-results"></div>
+    <div class="result-shell tall" id="workspace-results" role="status" aria-live="polite"></div>
   </section>
 </section>
 
 <section class="section account-section" id="account">
   <div class="section-heading compact" data-reveal>
     <p class="section-kicker">Product access</p>
-    <h2>Move from the public checker into the real account experience.</h2>
+    <h2>Keep the result. Build on it.</h2>
     <p>
-      The public checker is for quick evaluation. The dashboard gives you
-      persistent usage, API key lifecycle controls, audit history, and billing
-      entry points.
+      Create a free account to save audit history and check domains directly from your product with an API key.
     </p>
   </div>
 
@@ -111,12 +106,12 @@
       </div>
       <p>
         Start on the free plan, generate your first API key, and use the
-        dashboard to review usage before you wire billing and live traffic.
+        dashboard to review usage as you build your integration.
       </p>
       <ul class="card-points">
         <li>100 audits each month on the free launch tier</li>
         <li>Batch audits, API key management, and usage tracking</li>
-        <li>Upgrade to paid tiers when Stripe is configured</li>
+        <li>Clear monthly usage and rate limits</li>
       </ul>
       <div class="stacked-actions">
         {% if current_account %}
@@ -132,7 +127,7 @@
       <div class="panel-header">
         <div>
           <p class="panel-label">What you get</p>
-          <h2>Launch-ready account layer</h2>
+          <h2>A home for your domain checks</h2>
         </div>
       </div>
       <ul class="card-points">
@@ -142,11 +137,10 @@
           memory
         </li>
         <li>
-          Billing upgrade and portal entry points when Stripe env vars are
-          configured
+          Monthly usage tracking and account plan details
         </li>
         <li>
-          Support intake and legal pages so the site feels like a real product
+          Support when you need help understanding a result
         </li>
       </ul>
     </section>

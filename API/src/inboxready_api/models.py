@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, StringConstraints, field_validator
 
 from inboxready_api.domain_validation import normalize_domain
 
@@ -12,6 +12,13 @@ Severity = Literal["low", "medium", "high"]
 PlanName = Literal["free", "starter", "growth", "pro"]
 AuditJobStatus = Literal["queued", "running", "succeeded", "failed"]
 ExportFormat = Literal["json", "csv"]
+Selector = Annotated[str, StringConstraints(
+    strip_whitespace=True, min_length=1, max_length=63,
+    pattern=r"^[A-Za-z0-9_](?:[A-Za-z0-9_-]*[A-Za-z0-9_])?(?:\.[A-Za-z0-9_](?:[A-Za-z0-9_-]*[A-Za-z0-9_])?)*$",
+)]
+Selectors = Annotated[list[Selector], Field(max_length=10)]
+ProviderName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+ExpectedProviders = Annotated[list[ProviderName], Field(max_length=10)]
 
 
 class ProviderMatch(BaseModel):
@@ -47,11 +54,11 @@ class DomainAuditRequest(BaseModel):
         max_length=2048,
         description="The root domain or URL to inspect.",
     )
-    selectors: list[str] = Field(
+    selectors: Selectors = Field(
         default_factory=list,
         description="Optional DKIM selectors to test explicitly.",
     )
-    expected_providers: list[str] = Field(
+    expected_providers: ExpectedProviders = Field(
         default_factory=list,
         description="Optional provider names expected for this domain.",
     )
@@ -79,11 +86,11 @@ class BatchAuditRequest(BaseModel):
         max_length=10,
         description="Root domains to inspect. Duplicate normalized domains are audited once.",
     )
-    selectors: list[str] = Field(
+    selectors: Selectors = Field(
         default_factory=list,
         description="Optional DKIM selectors to test across every domain.",
     )
-    expected_providers: list[str] = Field(
+    expected_providers: ExpectedProviders = Field(
         default_factory=list,
         description="Optional provider names expected across every domain.",
     )
@@ -115,11 +122,11 @@ class MonitorCreateRequest(BaseModel):
         max_length=2048,
         description="The customer domain or URL to keep on the account watchlist.",
     )
-    selectors: list[str] = Field(
+    selectors: Selectors = Field(
         default_factory=list,
         description="Optional DKIM selectors to re-use whenever this monitor runs.",
     )
-    expected_providers: list[str] = Field(
+    expected_providers: ExpectedProviders = Field(
         default_factory=list,
         description="Optional provider names expected whenever this monitor runs.",
     )

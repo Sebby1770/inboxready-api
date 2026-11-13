@@ -17,6 +17,8 @@ _duration_total_ms = 0.0
 _status_counts: dict[str, int] = {}
 _route_counts: dict[str, int] = {}
 _recent_errors: deque[dict[str, Any]] = deque(maxlen=25)
+_MAX_ROUTE_KEYS = 256
+_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "CONNECT"})
 
 
 def record_request(
@@ -28,13 +30,17 @@ def record_request(
     request_id: str,
     error: str | None = None,
 ) -> None:
-    route_key = f"{method.upper()} {path}"
+    method = method.upper() if method.upper() in _METHODS else "OTHER"
+    path = path[:256]
+    route_key = f"{method} {path}"
     status_key = str(status_code)
     with _lock:
         global _requests_total, _errors_total, _duration_total_ms
         _requests_total += 1
         _duration_total_ms += duration_ms
         _status_counts[status_key] = _status_counts.get(status_key, 0) + 1
+        if route_key not in _route_counts and len(_route_counts) >= _MAX_ROUTE_KEYS - 1:
+            route_key = "OTHER __overflow__"
         _route_counts[route_key] = _route_counts.get(route_key, 0) + 1
         if status_code >= 500 or error:
             _errors_total += 1

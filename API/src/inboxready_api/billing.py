@@ -48,8 +48,13 @@ def plan_for_price_id(settings: Settings, price_id: str | None) -> PlanName:
 
 
 def create_checkout_session(settings: Settings, account: "AccountRecord", plan: PlanName) -> str:
+    if account.stripe_subscription_id and account.stripe_subscription_status not in {"canceled", "incomplete_expired"}:
+        raise BillingConfigurationError("Manage your existing subscription in the billing portal before starting another.")
     if not settings.stripe_secret_key:
         raise BillingConfigurationError("Stripe secret key is not configured.")
+
+    if not settings.stripe_webhook_secret:
+        raise BillingConfigurationError("Subscription checkout requires a configured Stripe webhook.")
 
     price_id = price_id_for_plan(settings, plan)
     if not price_id:
@@ -59,8 +64,8 @@ def create_checkout_session(settings: Settings, account: "AccountRecord", plan: 
         "mode": "subscription",
         "line_items[0][price]": price_id,
         "line_items[0][quantity]": "1",
-        "success_url": f"{settings.public_base_url}/app?checkout=success",
-        "cancel_url": f"{settings.public_base_url}/app?checkout=cancelled",
+        "success_url": f"{settings.public_base_url}/dashboard?checkout=success#billing",
+        "cancel_url": f"{settings.public_base_url}/dashboard?checkout=cancelled#billing",
         "metadata[account_id]": account.id,
         "metadata[plan]": plan,
         "subscription_data[metadata][account_id]": account.id,
@@ -90,7 +95,7 @@ def create_portal_session(settings: Settings, account: "AccountRecord") -> str:
         "/billing_portal/sessions",
         {
             "customer": account.stripe_customer_id,
-            "return_url": f"{settings.public_base_url}/app",
+            "return_url": f"{settings.public_base_url}/dashboard#billing",
         },
     )
     url = payload.get("url")

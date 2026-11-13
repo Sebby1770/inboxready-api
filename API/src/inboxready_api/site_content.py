@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
+from inboxready_api.commerce import PLAN_LIMITS
+
 HERO_METRICS = [
     {
         "value": "7",
@@ -154,84 +158,73 @@ OPS_CAPABILITIES = [
 
 PRICING_TIERS = [
     {
-        "name": "Starter",
-        "price": "$49",
-        "period": "/month",
-        "description": "For early-stage SaaS products that want a domain audit in onboarding fast.",
-        "features": [
-            "2,500 audits each month",
-            "Live audit API and provider fingerprints",
-            "Email support and shared rate limits",
-        ],
-        "cta": "Start With Starter",
-        "featured": False,
+        "name": "Starter", "price": "$49", "period": "/month", "audience": "For your first integration",
+        "description": "Bring domain readiness into your product.",
+        "features": ["2,500 audits each month", "60 audit units per minute", "All 7 protocol checks", "API keys, saved history and batch audits"],
+        "cta": "Start with Starter", "featured": False,
     },
     {
-        "name": "Growth",
-        "price": "$149",
-        "period": "/month",
-        "description": "For products with steady domain volume and a support team that needs clean outputs.",
-        "features": [
-            "15,000 audits each month",
-            "Batch jobs and webhook-ready roadmap",
-            "Priority support and higher limits",
-        ],
-        "cta": "Choose Growth",
-        "featured": True,
+        "name": "Growth", "price": "$149", "period": "/month", "audience": "For growing products",
+        "description": "Keep customer onboarding moving as you grow.",
+        "features": ["15,000 audits each month", "180 audit units per minute", "All Starter capabilities", "Domain watchlists and remediation playbooks"],
+        "cta": "Choose Growth", "featured": True,
     },
     {
-        "name": "Pro",
-        "price": "$399",
-        "period": "/month",
-        "description": "For agencies, platforms, and MSPs auditing many domains across customers.",
-        "features": [
-            "75,000 audits each month",
-            "Team usage visibility and SLA lane",
-            "Lower overage pricing for heavy volume",
-        ],
-        "cta": "Talk To Sales",
-        "featured": False,
+        "name": "Pro", "price": "$399", "period": "/month", "audience": "For larger portfolios",
+        "description": "Review domains across your customer base.",
+        "features": ["75,000 audits each month", "600 audit units per minute", "All Growth capabilities", "Account audit exports and queued domain audits"],
+        "cta": "Choose Pro", "featured": False,
     },
 ]
 
+# Keep acquisition links and displayed limits tied to the enforced plan catalog.
+for tier in PRICING_TIERS:
+    plan = tier["name"].lower()
+    tier["price"] = PLAN_LIMITS[plan].price_label
+    tier["dashboard_url"] = "/dashboard?" + urlencode({"plan": plan}) + "#billing"
+    tier["signup_url"] = "/signup?" + urlencode({"next": tier["dashboard_url"]})
+
+PROTOCOL_DETAILS = [
+    {"name": "MX", "title": "Can the domain receive mail?", "body": "Inspect mail routing records and detect the likely mailbox provider."},
+    {"name": "SPF", "title": "Who is allowed to send?", "body": "Find the sending policy, flag missing records, and check for excessive DNS lookups."},
+    {"name": "DKIM", "title": "Is the signing key published?", "body": "Check the selectors you provide for published DKIM keys. Selectors depend on your sending provider."},
+    {"name": "DMARC", "title": "What happens when authentication fails?", "body": "Inspect the policy and flag monitoring-only configurations that need review before enforcement."},
+    {"name": "BIMI", "title": "Is the brand record present?", "body": "Check for a BIMI record. A valid record alone does not guarantee that mailbox providers display your logo."},
+    {"name": "MTA-STS", "title": "Is transport protection configured?", "body": "Inspect the MTA-STS record and published policy for receiving mail over TLS."},
+    {"name": "TLS-RPT", "title": "Where do transport reports go?", "body": "Look for a TLS reporting record so delivery failures can be reported to the configured destination."},
+]
+
 FAQS = [
-    {
-        "question": "Is this a full DMARC analytics platform?",
-        "answer": (
-            "No. The current product position is API-first domain readiness and "
-            "remediation, which makes it lighter to ship and much easier to embed."
-        ),
-    },
-    {
-        "question": "Who is the best first customer?",
-        "answer": (
-            "B2B SaaS products that let customers send from their own domain. "
-            "They feel the pain during activation, support, and deliverability."
-        ),
-    },
-    {
-        "question": "What keeps churn low?",
-        "answer": (
-            "The audit sits inside onboarding and support workflows. Once a product "
-            "depends on that response to activate or troubleshoot accounts, it becomes sticky."
-        ),
-    },
-    {
-        "question": "What would you build next after this MVP?",
-        "answer": (
-            "API keys, usage metering, stored audit history, and Stripe billing hooks are now "
-            "in the launch layer. Queue-backed audits, due-monitor runs, and remediation "
-            "playbooks are now available; webhook alerts are the next retention feature."
-        ),
-    },
+    {"question": "What can I do on the free plan?", "answer": "Create an account, get an API key, and run 100 domain audits each calendar month. You can also try the rate-limited public checker without signing up."},
+    {"question": "Does a passing score guarantee inbox placement?", "answer": "No. InboxReady checks your domain's published email configuration. Content, reputation, consent, sending volume, and mailbox-provider decisions also affect delivery."},
+    {"question": "Do I need to change my email provider?", "answer": "No. InboxReady reads public DNS records and applicable transport policies. Keep your current sending provider; use the results to identify configuration changes."},
+    {"question": "How do audit limits work?", "answer": "A single-domain audit consumes one unit. A batch consumes one unit per domain. Monthly quotas reset on the first of the calendar month, and requests pause when your quota is exhausted. There are no automatic overage charges."},
+    {"question": "Can InboxReady discover every DKIM selector?", "answer": "No. Supply the selectors from your email provider for meaningful DKIM checks. The API accepts multiple selectors and explains missing or unverified configuration."},
+    {"question": "Can I cancel my subscription?", "answer": "Manage an active subscription through the billing portal in your dashboard. You can review payment details and available cancellation options there."},
 ]
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.0",
+        "date": "2026-11-13",
+        "display_date": "November 13, 2026",
+        "status": "Current release",
+        "title": "A clearer path from your first check to your first integration.",
+        "summary": "A redesigned website, simpler account setup, and clearer subscription controls.",
+        "highlights": [
+            "Try the domain checker from the homepage and explore all seven protocols.",
+            "Find a plan using your expected audit volume, then carry it through signup.",
+            "Copy API examples and keys, and follow a getting-started checklist in your dashboard.",
+            "Use improved mobile navigation and accessible forms with reduced-motion support.",
+            "Audit jobs run once; DNS work is bounded, and incomplete checkout configurations stay disabled.",
+        ],
+        "impact": "Understand what to check, what to fix, and how to integrate, with transparent plan limits.",
+    },
+    {
         "version": "1.0.0",
         "date": "2026-07-01",
         "display_date": "July 1, 2026",
-        "status": "Current release",
+        "status": "Deployment tooling",
         "title": "InboxReady is now Vercel-ready for preview and production deploys.",
         "summary": (
             "This release adds a Vercel deployment lane so the FastAPI product can ship "
@@ -468,7 +461,8 @@ SAMPLE_CURL = """curl -X POST https://api.inboxready.dev/v1/audits/email-domain 
     "expected_providers": ["Google Workspace"]
   }'"""
 
-SAMPLE_JS = """const response = await fetch("/v1/audits/email-domain", {
+SAMPLE_JS = """// Run on your server. Keep API keys private.
+const response = await fetch("INBOXREADY_BASE_URL/v1/audits/email-domain", {
   method: "POST",
   headers: {
     "Authorization": `Bearer ${process.env.INBOXREADY_API_KEY}`,
@@ -480,5 +474,6 @@ SAMPLE_JS = """const response = await fetch("/v1/audits/email-domain", {
   })
 });
 
+if (!response.ok) throw new Error(await response.text());
 const audit = await response.json();
 console.log(audit.score, audit.recommendations);"""

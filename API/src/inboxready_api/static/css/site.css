@@ -303,8 +303,8 @@ textarea {
 .cta-panel,
 .faq-card,
 .use-case-card {
-  opacity: 0;
-  transform: translateY(24px);
+  opacity: 1;
+  transform: none;
 }
 
 [data-reveal].is-visible,

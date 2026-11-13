@@ -35,9 +35,9 @@ pip install -e ".[dev]"
 uvicorn --app-dir src inboxready_api.main:app --reload
 ```
 
-Open the workspace at [http://127.0.0.1:8000/app](http://127.0.0.1:8000/app).
+Open the [website](http://127.0.0.1:8000/), [free domain checker](http://127.0.0.1:8000/app), or [interactive API reference](http://127.0.0.1:8000/docs).
 
-Create a launch account at `/app#account` or call `POST /v1/accounts`, then use the returned
+Create a browser account at `/signup` or provision an API-only account with `POST /v1/accounts`, then use the returned
 API key with `Authorization: Bearer $INBOXREADY_API_KEY`.
 
 Release notes are tracked in [CHANGELOG.md](./CHANGELOG.md) and served inside the app at `/changelog`.
@@ -53,7 +53,7 @@ The proxy includes rate limiting, short-lived docs/static caching, WebSocket upg
 
 ## Deploy With Vercel
 
-InboxReady can also run as a Vercel Python Function for preview URLs and a low-ops launch lane:
+InboxReady can also run as a Vercel Python Function for disposable previews. Do not use its temporary filesystem for paying customers:
 
 ```bash
 npm install -g vercel
@@ -73,6 +73,8 @@ pytest
 ```
 
 ## Launch
+
+Start with the [paid launch guide](./API/launch-guide.md): persistent hosting, Stripe test mode, first-customer checks, and what remains before going live.
 
 Use [`infra/production-readiness.md`](./infra/production-readiness.md) for the implementation matrix
 and launch steps covering Docker, Kubernetes, CI/CD, metrics, rate limiting, caching, cloud deployment,

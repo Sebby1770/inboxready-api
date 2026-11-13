@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from email.utils import parseaddr
+import time
 
 import dns.exception
 import dns.resolver
@@ -25,9 +26,31 @@ GOOGLE_REFERENCE = "https://support.google.com/a/answer/81126?hl=en-AL"
 YAHOO_REFERENCE = "https://senders.yahooinc.com/faqs/"
 
 
+class AuditBudgetExceeded(Exception):
+    """An incomplete audit must not be presented as a completed DNS report."""
+
+
+class AuditResolver:
+    def __init__(self, *, timeout_seconds: float = 15.0, max_queries: int = 64):
+        self.resolver = dns.resolver.Resolver()
+        self.deadline = time.monotonic() + timeout_seconds
+        self.queries_remaining = max_queries
+
+    def resolve(self, name: str, record_type: str):
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0 or self.queries_remaining <= 0:
+            raise AuditBudgetExceeded("DNS audit budget exceeded. Retry later with fewer selectors.")
+        self.queries_remaining -= 1
+        try:
+            return self.resolver.resolve(name, record_type, lifetime=min(3.0, remaining), search=False)
+        finally:
+            if time.monotonic() >= self.deadline:
+                raise AuditBudgetExceeded("DNS audit timed out. Retry later.")
+
+
 def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAuditResponse:
     domain = normalize_domain(request.domain)
-    resolver = dns.resolver.Resolver()
+    resolver = AuditResolver()
 
     root_txt = query_records(resolver, domain, "TXT")
     mx_records = query_records(resolver, domain, "MX")
@@ -88,7 +111,7 @@ def audit_domain(request: DomainAuditRequest, settings: Settings) -> DomainAudit
 
 
 def query_records(
-    resolver: dns.resolver.Resolver,
+    resolver: dns.resolver.Resolver | AuditResolver,
     name: str,
     record_type: str,
 ) -> list[str]:
