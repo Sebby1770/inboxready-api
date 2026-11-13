@@ -85,24 +85,27 @@ def _resolve_public_addresses(host: str) -> list[str]:
     return addresses
 
 
-def _validate_url(url: str) -> None:
+def _validate_url(url: str) -> list[str]:
     parsed = httpx.URL(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
         raise UnsafeRequestError(f"Disallowed URL scheme: {parsed.scheme or '(none)'}")
     host = parsed.host
     if not host:
         raise UnsafeRequestError("URL has no host.")
+    if parsed.userinfo or parsed.port not in {None, 443}:
+        raise UnsafeRequestError("Policy URLs must use HTTPS port 443 without credentials.")
     # If the host is already a literal IP, validate it directly; otherwise
     # resolve and validate every A/AAAA record before we ever open a socket.
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
-        _resolve_public_addresses(host)
+        return _resolve_public_addresses(host)
     else:
         if not _is_public_address(ip):
             raise UnsafeRequestError(
                 f"Refusing to fetch literal address {host}: not publicly routable."
             )
+        return [str(ip)]
 
 
 def safe_get(
@@ -120,18 +123,28 @@ def safe_get(
     production.
     """
 
-    headers = {"User-Agent": user_agent}
+    headers = {"User-Agent": user_agent, "Accept-Encoding": "identity"}
     current = url
     with httpx.Client(
         timeout=timeout,
         headers=headers,
         follow_redirects=False,
+        trust_env=False,
+        # Different hostnames may resolve to the same IP; do not reuse their TLS sessions.
+        limits=httpx.Limits(max_keepalive_connections=0),
     ) as client:
         for _ in range(_MAX_REDIRECTS + 1):
+            target = httpx.URL(current)
+            request_headers = {}
+            extensions = {}
             if not allow_private_networks:
-                _validate_url(current)
+                addresses = _validate_url(current)
+                request_headers["Host"] = target.netloc.decode("ascii")
+                extensions["sni_hostname"] = target.raw_host.decode("ascii")
+                # Pin the checked address, while verifying TLS against the original hostname.
+                target = target.copy_with(host=addresses[0])
 
-            with client.stream("GET", current) as response:
+            with client.stream("GET", target, headers=request_headers, extensions=extensions) as response:
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:
@@ -139,12 +152,14 @@ def safe_get(
                     current = str(httpx.URL(current).join(location))
                     continue
 
+                if response.headers.get("content-encoding", "identity").lower() != "identity":
+                    raise UnsafeRequestError("Compressed policy responses are not supported.")
                 body = bytearray()
-                for chunk in response.iter_bytes():
+                for chunk in response.iter_raw(chunk_size=16 * 1024):
                     body.extend(chunk)
                     if len(body) > _MAX_BYTES:
-                        break
-                text = body[:_MAX_BYTES].decode("utf-8", errors="replace")
+                        raise UnsafeRequestError("Policy response exceeds the size limit.")
+                text = body.decode("utf-8", errors="replace")
                 return SafeResponse(status_code=response.status_code, text=text)
 
     raise UnsafeRequestError("Too many redirects.")

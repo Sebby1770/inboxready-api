@@ -1,8 +1,8 @@
 # Vercel Deployment
 
-InboxReady can run on Vercel as a Python Function through `API/index.py`. This is a good preview,
-demo, and early-production lane when you want GitHub preview URLs and simple production promotion
-without operating containers.
+InboxReady has a Vercel Python adapter at `API/index.py` for disposable previews and demos.
+The current SQLite storage is not suitable for paid production on Vercel. Use the persistent-disk
+Render configuration for the current application, or complete and verify a managed-storage migration first.
 
 ## What Was Added
 

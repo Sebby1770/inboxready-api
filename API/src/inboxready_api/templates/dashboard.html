@@ -5,16 +5,21 @@
   <div class="section-heading compact" data-reveal>
     <p class="section-kicker">Dashboard</p>
     <h1>
-      Manage usage, rotate keys, and turn audits into a repeatable customer
-      workflow.
+      Your domains. A clearer picture.
     </h1>
     <p>
-      This is the operator surface for your actual account. It ties the audit
-      engine to plan limits, persistent history, billing entry points, and
-      support.
+      Review your sending setup, follow up on fixes, and keep your integration running.
     </p>
   </div>
 </section>
+
+{% if not audit_history.audits %}
+<section class="section onboarding-checklist" aria-label="Getting started">
+  <a href="#api-keys"><strong>01 / Get your API key</strong><span>Create or manage credentials for your backend.</span></a>
+  <a href="#run-audit"><strong>02 / Check your first domain</strong><span>Run an audit below to save your first report.</span></a>
+  <a href="/docs"><strong>03 / Connect your product</strong><span>Use the API reference to build your integration.</span></a>
+</section>
+{% endif %}
 
 <section class="section dashboard-command-strip" data-reveal>
   <a href="#insights">Insights</a>
@@ -37,8 +42,9 @@
     </div>
     <label>
       Plaintext API key
-      <textarea rows="3" readonly>{{ one_time_api_key }}</textarea>
+      <textarea id="new-api-key" rows="3" readonly>{{ one_time_api_key }}</textarea>
     </label>
+    <button type="button" class="button button-secondary key-copy" data-copy-key>Copy API key</button>
     <p class="result-note">
       This plaintext key is shown once. Copy it into your password manager or
       secret store before leaving the page.
@@ -506,20 +512,24 @@
       <div class="panel-header">
         <div>
           <p class="panel-label">Billing</p>
-          <h2>Plan controls</h2>
+          <h2>Your subscription</h2>
         </div>
         <span class="panel-badge">
-          {{ 'Stripe ready' if billing_enabled else 'Setup needed' }}
+          {{ usage.plan|capitalize }}
         </span>
       </div>
 
       <p class="result-note">
-        {% if billing_enabled %}
-          Create a Checkout session for upgrades or open the Stripe customer portal if this account already has a customer record.
+        {% if dashboard_account.stripe_subscription_id and dashboard_account.stripe_subscription_status not in ['canceled', 'incomplete_expired'] %}
+          Manage your existing subscription in the billing portal below.
+        {% elif available_paid_plans %}
+          Choose a plan below. Payment details and the final price are shown in secure checkout before you subscribe.
         {% else %}
-          Stripe is not configured yet. Add the price IDs and secrets in `.env` before using paid plan upgrades.
+          New paid subscriptions are not available yet. You can keep using your current plan.
         {% endif %}
       </p>
+      {% if request.query_params.get('checkout') == 'success' %}<p class="billing-selected" role="status">Checkout returned successfully. Your plan updates after payment confirmation arrives. Refresh this page to see your current plan.</p>{% elif request.query_params.get('checkout') == 'cancelled' %}<p class="result-note" role="status">Checkout cancelled. You can keep using your current plan.</p>{% endif %}
+      {% if selected_plan %}<p class="billing-selected">You selected <strong>{{ selected_plan|capitalize }}</strong>. Review your plan below to continue.</p>{% endif %}
 
       <div class="billing-actions">
         {% for tier in pricing_tiers %}
@@ -533,9 +543,9 @@
           <button
             class="button {% if not tier.featured %}button-secondary{% endif %} full-width"
             type="submit"
-            {% if not billing_enabled %}disabled{% endif %}
+            {% if tier.name|lower not in available_paid_plans or tier.name|lower == usage.plan or (dashboard_account.stripe_subscription_id and dashboard_account.stripe_subscription_status not in ['canceled', 'incomplete_expired']) %}disabled{% endif %}
           >
-            Upgrade to {{ tier.name }}
+            {{ 'Current plan:' if tier.name|lower == usage.plan else 'Choose' }} {{ tier.name }} · {{ tier.price }}/mo
           </button>
         </form>
         {% endfor %}
@@ -548,7 +558,7 @@
           <button
             class="button button-ghost full-width"
             type="submit"
-            {% if not billing_enabled %}disabled{% endif %}
+            {% if not billing_enabled or not dashboard_account.stripe_customer_id %}disabled{% endif %}
           >
             Open billing portal
           </button>

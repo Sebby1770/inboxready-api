@@ -8,6 +8,12 @@ services:
     startCommand: uvicorn inboxready_api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /readyz
     autoDeployTrigger: commit
+    # SQLite and exports require a single instance with a persistent disk.
+    numInstances: 1
+    disk:
+      name: inboxready-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5
@@ -16,4 +22,22 @@ services:
       - key: INBOXREADY_BATCH_MAX_WORKERS
         value: 5
       - key: INBOXREADY_USER_AGENT
-        value: InboxReady/0.1 (+https://example.com)
+        value: InboxReady/1.1
+      - key: INBOXREADY_ENVIRONMENT
+        value: production
+      - key: INBOXREADY_SESSION_SECRET
+        generateValue: true
+      - key: INBOXREADY_SESSION_HTTPS_ONLY
+        value: "true"
+      - key: INBOXREADY_PUBLIC_BASE_URL
+        sync: false
+      - key: INBOXREADY_SUPPORT_EMAIL
+        sync: false
+      - key: INBOXREADY_DATABASE_PATH
+        value: /var/data/inboxready.sqlite3
+      - key: INBOXREADY_OBJECT_STORE_PATH
+        value: /var/data/exports
+      - key: INBOXREADY_API_AUTH_REQUIRED
+        value: "true"
+      - key: INBOXREADY_ALLOW_UNPAID_PLAN_PROVISIONING
+        value: "false"

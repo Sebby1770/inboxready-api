@@ -43,6 +43,7 @@ from inboxready_api.billing import (
     create_checkout_session,
     create_portal_session,
     handle_stripe_webhook,
+    price_id_for_plan,
 )
 from inboxready_api.commerce import PLAN_LIMITS, RateLimitError, UsageLimitError, recent_window_start
 from inboxready_api.dashboard_insights import build_dashboard_insights
@@ -92,6 +93,7 @@ from inboxready_api.site_content import (
     LATEST_CHANGELOG,
     OPS_CAPABILITIES,
     PRICING_TIERS,
+    PROTOCOL_DETAILS,
     ROADMAP_ITEMS,
     SAMPLE_CURL,
     SAMPLE_JS,
@@ -99,7 +101,7 @@ from inboxready_api.site_content import (
     USE_CASES,
 )
 from inboxready_api.services.batch_audit import audit_domains, unique_normalized_domains
-from inboxready_api.services.dns_audit import audit_domain
+from inboxready_api.services.dns_audit import AuditBudgetExceeded, audit_domain
 from inboxready_api.services.provider_detection import get_provider_catalog
 from inboxready_api.settings import get_settings
 from inboxready_api.storage import (
@@ -155,7 +157,7 @@ app.add_middleware(
 def request_route_path(request: Request) -> str:
     route = request.scope.get("route")
     path = getattr(route, "path", None)
-    return path if isinstance(path, str) else request.url.path
+    return path if isinstance(path, str) else "__unmatched__"
 
 
 @app.middleware("http")
@@ -500,11 +502,8 @@ def execute_audit_job(account_id: str, job_id: str) -> AuditJobResponse | None:
     store = storage()
     job = store.mark_audit_job_running(account_id=account_id, job_id=job_id)
     if job is None:
-        return None
-    if job.status in {"succeeded", "failed"}:
-        return store.audit_job_response(job)
-    if job.status != "running":
-        return store.audit_job_response(job)
+        existing = store.get_audit_job(account_id=account_id, job_id=job_id)
+        return store.audit_job_response(existing) if existing else None
 
     try:
         request = DomainAuditRequest(**job.payload)
@@ -565,14 +564,16 @@ def render_page(
         "use_cases": USE_CASES,
         "flow_steps": FLOW_STEPS,
         "pricing_tiers": PRICING_TIERS,
+        "protocol_details": PROTOCOL_DETAILS,
+        "plan_catalog": {name: {"limit": plan.monthly_audits, "price": plan.price_label} for name, plan in PLAN_LIMITS.items()},
         "faqs": FAQS,
         "changelog_entries": CHANGELOG_ENTRIES,
         "changelog_preview": CHANGELOG_ENTRIES[:3],
         "latest_release": LATEST_CHANGELOG,
         "ops_capabilities": OPS_CAPABILITIES,
         "roadmap_items": ROADMAP_ITEMS,
-        "sample_curl": SAMPLE_CURL,
-        "sample_js": SAMPLE_JS,
+        "sample_curl": SAMPLE_CURL.replace("https://api.inboxready.dev", settings.public_base_url.rstrip("/")),
+        "sample_js": SAMPLE_JS.replace("INBOXREADY_BASE_URL", settings.public_base_url.rstrip("/")),
         "provider_catalog": get_provider_catalog(),
         "plan_limits": PLAN_LIMITS,
         "current_account": current_account,
@@ -582,6 +583,11 @@ def render_page(
         "public_base_url": settings.public_base_url.rstrip("/"),
         "canonical_url": str(request.url).split("?", 1)[0],
         "billing_enabled": bool(settings.stripe_secret_key),
+        "available_paid_plans": [
+            name for name in ("starter", "growth", "pro")
+            if settings.stripe_secret_key and settings.stripe_webhook_secret
+            and price_id_for_plan(settings, name)
+        ],
         "public_signup_enabled": settings.public_signup_enabled,
     }
     if extra_context:
@@ -593,11 +599,11 @@ def render_page(
 def root(request: Request) -> HTMLResponse:
     return render_page(
         request,
-        name="index.html",
+        name="home.html",
         page_title="Email Domain Readiness",
         page_description=(
-            "Polished SaaS front door for InboxReady, an API that audits customer "
-            "email domain setup and returns actionable remediation guidance."
+            "Check SPF, DKIM, DMARC and more with one email domain readiness API. "
+            "Get clear DNS fixes and start with 100 free audits per month."
         ),
     )
 
@@ -733,10 +739,10 @@ async def logout(request: Request) -> RedirectResponse:
 
 
 @app.get("/dashboard", response_class=HTMLResponse, response_model=None)
-def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
+def dashboard(request: Request, plan: str | None = None) -> HTMLResponse | RedirectResponse:
     account = current_account_from_session(request)
     if account is None:
-        return redirect_to_login("/dashboard")
+        return redirect_to_login(str(request.url.path) + (f"?plan={plan}" if plan in {"starter", "growth", "pro"} else ""))
 
     store = storage()
     audit_history = store.audit_history(account, limit=50)
@@ -754,6 +760,7 @@ def dashboard(request: Request) -> HTMLResponse | RedirectResponse:
         page_description="Usage, billing, API keys, and audit history for your InboxReady account.",
         extra_context={
             "dashboard_account": account,
+            "selected_plan": plan if plan in {"starter", "growth", "pro"} else None,
             "usage": usage,
             "audit_history": audit_history,
             "monitors": monitors,
@@ -1227,6 +1234,8 @@ async def health_long_poll(
 
 @app.post("/v1/accounts", response_model=AccountProvisionResponse)
 def create_account(request: AccountCreateRequest) -> AccountProvisionResponse:
+    if not get_settings().public_signup_enabled:
+        raise HTTPException(status_code=403, detail="Public signup is disabled.")
     if request.plan != "free" and not get_settings().allow_unpaid_plan_provisioning:
         raise HTTPException(
             status_code=400,
@@ -1665,6 +1674,11 @@ async def stripe_webhook(request: Request) -> dict[str, str]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except WebhookSignatureError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.exception_handler(AuditBudgetExceeded)
+def audit_budget_exception_handler(_request: Request, exc: AuditBudgetExceeded) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)}, headers={"Retry-After": "30"})
 
 
 @app.exception_handler(AuthenticationError)

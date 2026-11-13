@@ -17,3 +17,6 @@ API/.venv/
 API/src/*.egg-info/
 API/var/
 var/
+.playwright-cli/
+output/playwright/
+.vercel/

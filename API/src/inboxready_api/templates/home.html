@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<script type="application/json" id="plan-catalog">{{ plan_catalog|tojson }}</script>
+<section class="launch-hero section">
+  <div class="launch-copy">
+    <a class="release-link" href="/changelog"><span class="status-dot ready"></span> Built for your next customer domain <span aria-hidden="true">↗</span></a>
+    <h1>Good email starts<br>with a <em>ready domain.</em></h1>
+    <p class="launch-lead">Catch email setup issues before your customers hit send. One API for authentication checks, clear fixes, and a smoother onboarding experience.</p>
+    <form action="/app" method="get" class="domain-launch">
+      <label class="sr-only" for="launch-domain">Your sending domain</label><span aria-hidden="true">◎</span>
+      <input id="launch-domain" name="domain" type="text" placeholder="yourcompany.com" required maxlength="253" autocomplete="url" autocapitalize="none" spellcheck="false">
+      <button class="button" type="submit">Check my domain <span aria-hidden="true">↗</span></button>
+    </form>
+    <p class="microcopy">Free domain check. No account or credit card needed.</p>
+    <div class="hero-bottom"><a class="text-link" href="/signup">Build with the API <span aria-hidden="true">→</span></a><span>100 free audits / month</span></div>
+  </div>
+  <div class="report-stage" aria-label="Illustrative domain readiness report">
+    <div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div>
+    <div class="report-stamp">CHECK. FIX. SEND.</div>
+    <article class="sample-report">
+      <div class="report-top"><span class="mini-mark" aria-hidden="true">↗</span><strong>Domain readiness</strong><span class="sample-label">Example report</span></div>
+      <div class="report-domain"><div><span class="mono-label">SENDING DOMAIN</span><h2>acme.example</h2></div><span class="report-symbol" aria-hidden="true">◎</span></div>
+      <div class="report-score"><div class="score-ring"><strong>82<span>/ 100</span></strong></div><div><span class="status-pill status-warn">Needs review</span><h3>A few fixes from ready.</h3><p>Start with your DMARC policy.</p></div></div>
+      <div class="report-check"><span><i class="check-icon">✓</i> SPF authorization</span><strong>Passed</strong></div>
+      <div class="report-check"><span><i class="check-icon">✓</i> DKIM signatures</span><strong>Passed</strong></div>
+      <div class="report-check"><span><i class="check-icon warning">!</i> DMARC policy</span><strong class="warning-text">Review</strong></div>
+      <div class="report-fix"><span class="mono-label">YOUR NEXT STEP</span><p>Review your monitoring-only DMARC policy before moving toward enforcement.</p><span>Guidance your team can act on ↗</span></div>
+      <div class="report-foot"><span>7 protocol checks</span><span>One readable response</span></div>
+    </article>
+    <div class="floating-note"><span class="check-icon">✓</span><div><strong>Less DNS detective work.</strong><span>More customers ready to send.</span></div></div>
+  </div>
+</section>
+<section class="protocol-band" aria-label="Supported checks"><span>EVERY LAYER, ONE API</span><div>MX <i>·</i> SPF <i>·</i> DKIM <i>·</i> DMARC <i>·</i> BIMI <i>·</i> MTA-STS <i>·</i> TLS-RPT</div></section>
+<section class="section product-story" id="product">
+  <div class="split-heading"><div><p class="section-kicker">FROM DNS TO DONE</p><h2>Make domain setup<br>the easy part.</h2></div><p>Give engineering the structured data it needs, and everyone else a clear answer to “what do we fix?”</p></div>
+  <div class="feature-mosaic">
+    <article class="feature-primary"><span class="feature-index">01 / CHECK</span><h3>Seven checks.<br>The whole picture.</h3><p>Inspect authentication, routing, and transport settings together. Explore what each check tells you.</p><div class="protocol-picker" aria-label="Explore protocol checks">{% for protocol in protocol_details %}<button type="button" data-protocol="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ protocol.name }}</button>{% endfor %}</div><div class="protocol-explanation" aria-live="polite">{% for protocol in protocol_details %}<div data-protocol-panel="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %}><strong>{{ protocol.title }}</strong><p>{{ protocol.body }}</p></div>{% endfor %}</div></article>
+    <article class="feature-secondary"><span class="feature-index">02 / FIX</span><div class="mini-task"><span class="check-icon warning">!</span><div><strong>Publish a DMARC record</strong><span>DNS administrator · High priority</span></div></div><h3>Answers, not a wall of records.</h3><p>Prioritized recommendations and remediation playbooks turn a failed check into a practical next step.</p></article>
+    <article class="feature-secondary feature-mint"><span class="feature-index">03 / FOLLOW THROUGH</span><div class="mini-history"><span>customer.example</span><span class="status-pill status-pass">Ready</span><span>sender.example</span><span class="status-pill status-warn">Review</span></div><h3>Keep the context.</h3><p>Save audit history, maintain a domain watchlist, and recheck customer portfolios in batches.</p></article>
+  </div>
+</section>
+<section class="section integration-section" id="workflow">
+  <div><p class="section-kicker">MADE FOR BUILDERS</p><h2>Your onboarding.<br>Our DNS homework.</h2><p class="section-description">Call the API from your backend. Use the score, protocol results, and recommendations to guide your customer's next step.</p><ol class="integration-steps"><li><span>01</span> Create an account and get your API key.</li><li><span>02</span> Send a domain and optional DKIM selectors.</li><li><span>03</span> Show the result inside your product.</li></ol><a class="text-link" href="/docs">Explore the API reference ↗</a></div>
+  <div class="integration-code"><div class="code-toolbar"><div aria-label="Code language"><button type="button" data-code-tab="curl" aria-pressed="true">cURL</button><button type="button" data-code-tab="javascript" aria-pressed="false">JavaScript</button></div><button type="button" data-copy-code>Copy code</button></div><pre data-code-panel="curl"><code>{{ sample_curl }}</code></pre><pre data-code-panel="javascript" hidden><code>{{ sample_js }}</code></pre><div class="code-foot"><span class="status-dot ready"></span> Structured JSON · Bearer authentication <span data-copy-feedback role="status"></span></div></div>
+</section>
+<section class="section audience-section"><p class="section-kicker">BUILT INTO YOUR WORKFLOW</p><div class="audience-grid">{% for use_case in use_cases %}<article><span class="mono-label">{{ use_case.eyebrow }}</span><h3>{{ use_case.title }}</h3><p>{{ use_case.body }}</p></article>{% endfor %}</div></section>
+<section class="section pricing-section launch-pricing" id="pricing">
+  <div class="split-heading"><div><p class="section-kicker">ROOM TO GROW</p><h2>Start free.<br>Scale when you're ready.</h2></div><p>100 audits every month on Free. Predictable monthly plans when domain checks become part of your product.</p></div>
+  <div class="plan-advisor"><div><label for="monthly-audits">How many audits do you need each month?</label><span>Each domain in a batch counts as one audit.</span></div><input id="monthly-audits" type="number" value="2500" min="1" max="10000000" step="1" inputmode="numeric"><output for="monthly-audits" data-plan-recommendation aria-live="polite">Starter fits · $49/month</output></div>
+  <div class="pricing-grid">{% for tier in pricing_tiers %}<article class="price-card {% if tier.featured %}featured{% endif %}"><p class="card-kicker">{{ 'For growing products' if tier.featured else tier.audience }}</p><h3>{{ tier.name }}</h3><p class="price-line">{{ tier.price }}<span>/ month</span></p><p class="price-description">{{ tier.description }}</p><ul class="card-points">{% for feature in tier.features %}<li>{{ feature }}</li>{% endfor %}</ul><a class="button {% if not tier.featured %}button-secondary{% endif %}" href="{{ tier.signup_url if not current_account else tier.dashboard_url }}">{{ tier.cta }} ↗</a></article>{% endfor %}</div>
+  <div class="free-plan-note"><strong>Just getting started?</strong> Free includes 100 audits/month and an API key. <a href="/signup">Create a free account →</a></div><p class="pricing-fineprint">Prices in USD. Monthly quotas reset on the first of the calendar month. Usage pauses at your limit; no automatic overage charges.</p>
+</section>
+<section class="section launch-faq" id="faq"><div><p class="section-kicker">A LITTLE CLARITY</p><h2>Before you<br>hit send.</h2><p>Still have a question?<br><a class="text-link" href="/support">Talk to us ↗</a></p></div><div class="faq-accordion">{% for faq in faqs %}<details><summary>{{ faq.question }}<span aria-hidden="true">+</span></summary><p>{{ faq.answer }}</p></details>{% endfor %}</div></section>
+<section class="section launch-cta"><span class="mono-label">A BETTER START FOR EVERY SENDER</span><h2>Ready for your<br>next customer domain?</h2><div><a href="/app" class="button">Run a free audit ↗</a><a href="/signup" class="text-link">Get your API key →</a></div><p>100 free audits per month. No credit card required.</p></section>
+{% endblock %}

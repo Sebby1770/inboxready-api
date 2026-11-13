@@ -138,7 +138,8 @@ function renderAuditPlaybook(audit) {
 
 function recentDomains() {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_DOMAINS_KEY) || "[]");
+    const stored = JSON.parse(localStorage.getItem(RECENT_DOMAINS_KEY) || "[]");
+    return Array.isArray(stored) ? stored.filter(item => typeof item === 'string').slice(0, 6) : [];
   } catch {
     return [];
   }
@@ -147,7 +148,8 @@ function recentDomains() {
 function saveRecentDomain(domain) {
   const deduped = recentDomains().filter((item) => item !== domain);
   deduped.unshift(domain);
-  localStorage.setItem(RECENT_DOMAINS_KEY, JSON.stringify(deduped.slice(0, 6)));
+  try { localStorage.setItem(RECENT_DOMAINS_KEY, JSON.stringify(deduped.slice(0, 6))); }
+  catch { /* A blocked storage API must not hide a successful audit. */ }
 }
 
 function renderRecentDomains(container, onSelect) {
@@ -413,6 +415,7 @@ function initAuditForm(form) {
 
     submitButton.disabled = true;
     submitButton.textContent = "Running…";
+    resultsTarget.setAttribute("aria-busy", "true");
     renderLoadingState(resultsTarget, domain);
 
     try {
@@ -433,6 +436,7 @@ function initAuditForm(form) {
       );
     } finally {
       submitButton.disabled = false;
+      resultsTarget.setAttribute("aria-busy", "false");
       submitButton.textContent = submitButton.classList.contains("full-width")
         ? "Run Domain Audit"
         : "Run Audit";
@@ -444,7 +448,8 @@ function initAuditForm(form) {
   if (queryDomain && !form.dataset.autoloaded) {
     form.dataset.autoloaded = "true";
     domainInput.value = queryDomain;
-    form.requestSubmit();
+    // A dashboard link may prefill a domain but must not spend account quota.
+    if (window.location.pathname === "/app") form.requestSubmit();
   }
 }
 
